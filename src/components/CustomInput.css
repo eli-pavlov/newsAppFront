@@ -1,0 +1,36 @@
+.custom-input-wrapper {
+    padding: 8px;
+}
+
+.custom-input-wrapper.one-row {
+    display: flex;
+}
+
+.custom-input-wrapper input {
+    width: 100%;
+    font-size: 16px;
+    padding: 8px;
+    border: 2px solid black;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
+
+.custom-input-wrapper input.with-icon {
+    padding-right: 24px;
+}
+
+.custom-input-wrapper label.one-row {
+    flex-shrink: 0;
+    padding-right: 8px;
+}
+
+.custom-input-wrapper label:not(.one-row) {
+    display: block;
+    padding-bottom: 4px;
+}
+
+.custom-input-wrapper i {
+    position: absolute;
+    font-size: larger;
+    transform: translate(-125%, 50%);
+}
