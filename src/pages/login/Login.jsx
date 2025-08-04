@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './Login.css'
 import { useLocation } from 'wouter'
 import { useAuthContext } from '../../contexts/AuthContext';
@@ -11,12 +11,24 @@ export function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [errMsg, setErrMsg] = useState("");
+    const [protectedUsers, setProtectedUsers] = useState([]);
+    const [autoLoginUser, setAutoLoginUser] = useState('');
 
     const [_, navigate] = useLocation();
 
     const { setUser } = useAuthContext();
 
     const { setSettings } = useSettingsContext();
+
+    async function fillProtectedUsers() {
+        const result = await db.getProtectedUsers();
+
+        setProtectedUsers(result.data);
+    }
+
+    useEffect(() => {
+        fillProtectedUsers();
+    }, [])
 
     async function initSettings() {
         const dbSettings = await getSettingsFromDB();
@@ -27,7 +39,11 @@ export function LoginPage() {
     async function login(e) {
         e.preventDefault();
 
-        const result = await db.login(email, password);
+        let result = null;
+        if (autoLoginUser === '')
+            result = await db.login(email, password);
+        else
+            result = await db.login(autoLoginUser.email, autoLoginUser.password);
 
         if (!result.success)
             setErrMsg(result.message);
@@ -54,10 +70,11 @@ export function LoginPage() {
                             (e) => {
                                 setEmail(e.target.value);
                                 setErrMsg('');
+                                setAutoLoginUser('');
                             }
                         }
                         value={email}
-                        required
+                        required={ !(!!autoLoginUser) }
                     />
                 </div>
                 <div className='element'>
@@ -69,11 +86,34 @@ export function LoginPage() {
                             (e) => {
                                 setPassword(e.target.value);
                                 setErrMsg('');
+                                setAutoLoginUser('');
                             }
                         }
                         value={password}
-                        required
+                        required={ !(!!autoLoginUser) }
                     />
+                </div>
+
+                <div className='element'>
+                    <label htmlFor="users">Select user</label>
+                    <select
+                        value = { autoLoginUser?.name ?? '' }
+                        onChange = { (e) => { 
+                            setEmail('');
+                            setPassword('');
+
+                            const autoUser = protectedUsers.find(u => u.name === e.target.value);
+                            
+                            setAutoLoginUser(autoUser);
+                        }}
+                    >
+                        <option key='empty' value=''></option>
+                        {
+                            protectedUsers.map((u, index) => (
+                                <option key={index} value={u.name}>{u.name}</option>
+                            ))
+                        }
+                    </select>
                 </div>
 
                 <button type="submit">Login</button>

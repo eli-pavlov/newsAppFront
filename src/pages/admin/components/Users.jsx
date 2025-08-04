@@ -191,7 +191,10 @@ function Users({ users, setUsers, setActiveTab }) {
                                                     <div className='font-icon' onClick={(e) => { switchToUserSettings(e, u) }}>
                                                         <i className="fa fa-gear"></i>
                                                     </div>
-                                                    <div className='font-icon' onClick={() => { deleteUser(u) }}>
+                                                    <div className={`font-icon ${u.protected ? 'disabled' : ''}`} onClick={() => { 
+                                                        if (!u.protected)
+                                                            deleteUser(u) 
+                                                    }}>
                                                         <i className="fa fa-trash"></i>
                                                     </div>
                                                 </div>

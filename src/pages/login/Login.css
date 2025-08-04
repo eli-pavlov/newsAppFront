@@ -33,11 +33,13 @@
     font-size: 20px;
 }
 
-.element input {
+.element input, .element select {
     font-size: 20px;
     float: right;
     padding: 4px;
     border-radius: 8px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .login button {

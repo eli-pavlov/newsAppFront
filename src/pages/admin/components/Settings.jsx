@@ -10,7 +10,7 @@ import Section from '../components/Section';
 import AdminCustomInput from './AdminCustomInput'
 import { envVar } from '../../../utils/env';
 
-function Settings( { cancelFunc }) {
+function Settings({ cancelFunc, user }) {
     const [_, navigate] = useLocation();
 
     const [openDeleteModal, setOpenDeleteModal] = useState(false);
@@ -31,25 +31,51 @@ function Settings( { cancelFunc }) {
 
     const [onlineMoviesCategories, setOnlineMoviesCategories] = useState([]);
 
+    const [keysPressed, setKeysPressed] = useState([]);
+
     function initPageSettings() {
         setTheme(settings.colors_theme);
 
         setTitle(settings.title);
-        
+
         setFooterMessages(settings.footer_messages.map(m => { return { ...m, ['disabled']: true } }));
-        
+
         setMovies(settings.movies.map(m => { return { ...m } }));
 
         const savedMoviesCategories = settings.online_movies_categories || [];
         const selectedSavedMoviesCategories = savedMoviesCategories.filter(c => c.selected).map(c => c.name);
         let envMoviesCategories = envVar('ONLINE_MOVIES_CATEGORIES').split(',');
-        const settingsMoviesCategories = envMoviesCategories.map(c => { return {name:c, selected:selectedSavedMoviesCategories.includes(c)}});
+        const settingsMoviesCategories = envMoviesCategories.map(c => { return { name: c, selected: selectedSavedMoviesCategories.includes(c) } });
         setOnlineMoviesCategories(settingsMoviesCategories);
     }
 
     useEffect(() => {
         initPageSettings();
     }, [])
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (keysPressed.includes(e.key))
+                return;
+
+            const newKeysList = [...keysPressed, e.key];
+            
+            setKeysPressed(newKeysList);
+        };
+
+        const handleKeyUp = (e) => {
+            setKeysPressed([]);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+
+        // Clean up on unmount
+        return () => {
+            window.removeEventListener('keyup', handleKeyUp);
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [keysPressed])
 
     function enableTitle() {
         setlockTile(null);
@@ -103,8 +129,8 @@ function Settings( { cancelFunc }) {
         newSettings.colors_theme = theme;
         newSettings.title = title;
         newSettings.footer_messages = footerMessages.map((m, index) => ({ ...m, id: index }));
-        newSettings.movies = movies.map((m, index) => ({ ...m, id: index}));
-        newSettings.online_movies_categories = onlineMoviesCategories.map((c, index) => ({ ...c, id: index}));
+        newSettings.movies = movies.map((m, index) => ({ ...m, id: index }));
+        newSettings.online_movies_categories = onlineMoviesCategories.map((c, index) => ({ ...c, id: index }));
 
         await db.saveSettings(newSettings);
         setSettings(newSettings);
@@ -137,6 +163,10 @@ function Settings( { cancelFunc }) {
         })
 
         setOnlineMoviesCategories(updatedMoviesCategories);
+    }
+
+    function cheatKeys() {
+        return keysPressed.includes('Control') && keysPressed.includes('Shift');
     }
 
     return (
@@ -333,10 +363,10 @@ function Settings( { cancelFunc }) {
                         <div className='movies-categories'>
                             {
                                 onlineMoviesCategories.map((c, index) => (
-                                    <div 
-                                        key={index} 
+                                    <div
+                                        key={index}
                                         className={`movie-category ${c.selected ? 'selected' : ''}`}
-                                        onClick={() => {clickMovieCategory(c.name)}}
+                                        onClick={() => { clickMovieCategory(c.name) }}
                                     >
                                         {c.name}
                                     </div>
@@ -352,7 +382,9 @@ function Settings( { cancelFunc }) {
                                     name: "save",
                                     text: 'Save Settings',
                                     type: "button",
-                                    onClick: (() => { saveSettingsToDB() }),
+                                    noHover: (!user.editable && !cheatKeys()),
+                                    disabled: (!user.editable && !cheatKeys()) ? true : false,
+                                    onClick: (user.editable || cheatKeys()) ? (() => { saveSettingsToDB() }) : null,
                                     style: { "padding": '12px', 'fontSize': '24px' },
                                 }
                             }

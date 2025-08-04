@@ -18,7 +18,7 @@ function AdminPage() {
     const { isUserRole } = useAuthContext();
     const [activeTab, setActiveTab] = useState('settings');
     const [users, setUsers] = useState([]);
-    const { setUser } = useAuthContext();
+    const { user, setUser } = useAuthContext();
 
     async function getAllUsers() {
         const dbUsers = await db.getAllUsers();
@@ -86,12 +86,12 @@ function AdminPage() {
                 <div className='tab-area'>
                     {
                         (activeTab === 'settings') &&
-                        <Settings cancelFunc={cancel} />
+                        <Settings cancelFunc={cancel} user={ user } />
                     }
 
                     {
                         (activeTab === 'users') &&
-                        <Users users={users} setUsers={ setUsers } setActiveTab={setActiveTab} />
+                        <Users users={ users } setUsers={ setUsers } setActiveTab={setActiveTab} />
                     }
                 </div>
             </div>

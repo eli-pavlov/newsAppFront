@@ -169,6 +169,23 @@ class DB_SERVER {
         })
     }
 
+    async getProtectedUsers() {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const result = await this.createFetch('/user/protected', 'get');
+                const response = await result.json();
+
+                if (response.success)
+                    resolve(response);
+                else
+                    resolve({success:false, message:response.message});
+            }
+            catch (e) {
+                reject({success:false, message:e.message})
+            }
+        })
+    }
+
     async addUser(userData) {
         return new Promise(async (resolve, reject) => {
             try {

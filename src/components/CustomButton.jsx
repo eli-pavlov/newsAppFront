@@ -2,10 +2,15 @@ import './CustomButton.css'
 
 export function CustomButton( { btnData } ) {
     return (
-        <div className={`custom-button-wrapper ${btnData.noHover ? 'no-hover' : ''}`}>
+        <div className={
+            `
+                custom-button-wrapper 
+                ${btnData.noHover ? 'no-hover' : null}
+            `}>
             <button 
                 name = { btnData.name }
                 type= { btnData.type || "submit" }
+                className={`${btnData.disabled ? 'disabled' : null}`}
                 style = { btnData.style || null }
                 value = { btnData.value || null }
                 onClick = { btnData.onClick || null }
