@@ -4,11 +4,11 @@ import { setEnvVarsFromServer } from "../utils/env";
 
 class DB_SERVER {
     constructor() {
+        this.serverUrl=envVar('SERVER_URL');
     }
 
     createFetch(urlParams, method, body=null, addToken=false) {
-        const serverUrl=envVar('SERVER_URL');
-        const apiUrl = `${serverUrl}${urlParams}`;
+        const apiUrl = `${this.serverUrl}${urlParams}`;
 
         let headers = {
             'Content-Type': 'application/json',
