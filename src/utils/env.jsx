@@ -1,3 +1,5 @@
+import config from "../config";
+
 let envVarsFromServer = {};
 
 export function setEnvVarsFromServer(lst) {
@@ -9,7 +11,9 @@ export function envVar(key) {
         key = `VITE_${key}`;
     
     const varKey = `${key.toUpperCase()}`;
+    
+    const val = envVarsFromServer[varKey] || import.meta.env[varKey] || config[varKey];
 
-    return envVarsFromServer[varKey] || import.meta.env[varKey];
+    return val;
 }
 

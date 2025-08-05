@@ -7,7 +7,7 @@ class DB_SERVER {
     }
 
     createFetch(urlParams, method, body=null, addToken=false) {
-        const serverUrl=envVar('SERVER_API_URL');
+        const serverUrl=envVar('SERVER_URL');
         const apiUrl = `${serverUrl}${urlParams}`;
 
         let headers = {
