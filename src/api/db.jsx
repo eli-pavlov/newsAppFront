@@ -4,7 +4,7 @@ import { setEnvVarsFromServer } from "../utils/env";
 
 class DB_SERVER {
     constructor() {
-        this.serverUrl=envVar('SERVER_URL');
+        this.serverUrl=envVar('SERVER_URL') || window.location.href;
     }
 
     createFetch(urlParams, method, body=null, addToken=false) {
