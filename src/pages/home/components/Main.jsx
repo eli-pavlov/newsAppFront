@@ -100,7 +100,8 @@ function MovieArea() {
     function initMovies() {
         let viewMovies = [];
 
-        movieList.current = viewMovies.map(m => m.url);
+        movieList.current = []; //viewMovies.map(m => m.url);
+        
         settings.movies.forEach(m => { 
             if (m.active)
                 viewMovies.push({...m});

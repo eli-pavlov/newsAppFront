@@ -13,9 +13,10 @@ import { envVar } from '../../../utils/env';
 function Settings({ cancelFunc, user }) {
     const [_, navigate] = useLocation();
 
-    const [openDeleteModal, setOpenDeleteModal] = useState(false);
+    const [openConfirmModal, setOpenConfirmModal] = useState(false);
+    let confirmData = useRef({})
+
     const [addFooterMsgModal, setAddFooterMsgModal] = useState(false);
-    const actionMsgIndex = useRef(0);
 
     const [title, setTitle] = useState('')
     const [lockTitle, setlockTile] = useState(true)
@@ -32,6 +33,11 @@ function Settings({ cancelFunc, user }) {
     const [onlineMoviesCategories, setOnlineMoviesCategories] = useState([]);
 
     const [keysPressed, setKeysPressed] = useState([]);
+
+    const [file, setFile] = useState(null);
+    const [uploadMsg, setUploadMsg] = useState('');
+    const [progressWidth, setProgressWidth] = useState(0);
+    const [disableUploadButtons, setDisableUploadButtons] = useState(false);
 
     function initPageSettings() {
         setTheme(settings.colors_theme);
@@ -59,7 +65,7 @@ function Settings({ cancelFunc, user }) {
                 return;
 
             const newKeysList = [...keysPressed, e.key];
-            
+
             setKeysPressed(newKeysList);
         };
 
@@ -120,8 +126,12 @@ function Settings({ cancelFunc, user }) {
     }
 
     function removeFooterMsg(msgIndex) {
-        actionMsgIndex.current = msgIndex;
-        setOpenDeleteModal(true);
+        confirmData.current = {
+            msg: 'Delete this message?',
+            yesHandler: () => { updateFooterMessage(msgIndex, 'delete') },
+        };
+
+        setOpenConfirmModal(true);
     }
 
     async function saveSettingsToDB() {
@@ -169,6 +179,78 @@ function Settings({ cancelFunc, user }) {
         return keysPressed.includes('Control') && keysPressed.includes('Shift');
     }
 
+    function openFileSelection() {
+        setUploadMsg('');
+        document.querySelector('#file-select').click();
+    }
+
+    function fileSelected(e) {
+        setProgressWidth(0);
+
+        if (e.target.files.length === 0) {
+            setFile(null);
+        }
+        else {
+            const selectedFile = e.target.files[0];
+
+            if (selectedFile.name.endsWith('mp4')) {
+                setFile(selectedFile);
+            }
+            else {
+                setFile(null);
+                setUploadMsg('Invalid file format.');
+            }
+        }
+    };
+
+    async function uploadMovie() {
+        // const uploadCB = (progressEvent) => {
+        //     const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        //     setProgressWidth(percent);
+        //     console.log(`Upload progress: ${percent}%`);
+        // }
+
+        // const result = await db.uploadMovie(file, uploadCB, user?.id ? user.id : user._id);
+
+        let processW = 10;
+        setUploadMsg('Uploading file, please wait...');
+        setDisableUploadButtons(true);
+        const processInterval = setInterval(() => {
+            setProgressWidth(processW);
+            processW = Math.min(processW + 10, 95);
+        }, 2000)
+        const result = await db.uploadMovie(file, null, user?.id ? user.id : user._id);
+
+        clearInterval(processInterval);
+        setProgressWidth(100);
+        setDisableUploadButtons(false);
+
+        setUploadMsg(result.message);
+
+        if (result.success) {
+            setFile(null);
+            const { file_name, url, deletable, subFolder, times } = result;
+            setMovies([...movies.filter(m => m.url !== url), { file_name, url, subFolder, deletable, times }]);
+        }
+    }
+
+    async function deleteMovie(index, fileName, subFolder) {
+        confirmData.current = {
+            msg: 'Delete this movie?',
+            yesHandler: () => { deleteMovieFile(index, fileName, subFolder) },
+        };
+
+        setOpenConfirmModal(true);
+    }
+
+    async function deleteMovieFile(index, fileName, subFolder) {
+        const result = await db.deleteMovie(fileName, subFolder);
+
+        if (result.success) {
+            setMovies(movies.filter((f, ind) => ind !== index));
+        }
+    }
+
     return (
         <>
             {
@@ -176,20 +258,19 @@ function Settings({ cancelFunc, user }) {
                 <AddFooterMsgModal
                     closeHandler={() => { setAddFooterMsgModal(false) }}
                     saveHandler={(val) => { updateFooterMessage(-1, 'add', val) }}
-                    msgIndex={actionMsgIndex.current}
                 />
             }
 
             {
-                openDeleteModal &&
+                openConfirmModal &&
                 <ConfirmModal
-                    titleData={{ text: `Delete this message?`, style: { fontSize: "24px" } }}
+                    titleData={{ text: confirmData.current.msg, style: { fontSize: "24px" } }}
                     yesData={
                         {
                             text: "Yes",
                             style: { "backgroundColor": "red", "border": "none", "padding": "16px", "fontWeight": "bold" },
                             noHover: true,
-                            actionHandler: (() => { updateFooterMessage(actionMsgIndex.current, 'delete') })
+                            actionHandler: confirmData.current.yesHandler
                         }
                     }
                     noData={
@@ -198,7 +279,7 @@ function Settings({ cancelFunc, user }) {
                             style: { "backgroundColor": "white", "color": "black", "padding": "16px", "border": "none" }
                         }
                     }
-                    closeHandler={() => { setOpenDeleteModal(false) }}
+                    closeHandler={() => { setOpenConfirmModal(false) }}
                 />
             }
 
@@ -293,68 +374,123 @@ function Settings({ cancelFunc, user }) {
                     </Section>
 
                     <Section title="Downloaded Movies">
-                        <div className='movies'>
-                            <div className='movies-table'>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th width="30%">File Name</th>
-                                            <th width="30%">Times in Cycle</th>
-                                            <th width="15%">Active</th>
-                                            <th width="30%">Preview</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {
-                                            movies &&
-                                            movies.map((m, index) => (
-                                                <tr key={m.file_name}>
-                                                    <td>
-                                                        {m.file_name}
-                                                    </td>
-                                                    <td>
-                                                        <select value={m.times} onChange={(e) => {
-                                                            const updatedMovies = [...movies];
-                                                            updatedMovies[index].times = e.target.value;
-                                                            setMovies(updatedMovies);
-                                                        }}>
-                                                            <option value="1">1</option>
-                                                            <option value="2">2</option>
-                                                            <option value="3">3</option>
-                                                        </select>
-                                                    </td>
-                                                    <td>
-                                                        <div className='active'>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={m.active}
-                                                                onChange={() => {
-                                                                    const updatedMovies = [...movies];
-                                                                    updatedMovies[index].active = !updatedMovies[index].active;
-                                                                    setMovies(updatedMovies);
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        <div className='actions'>
-                                                            <div className='font-icon' onClick={() => { previewMovie(m.url/*file_name*/) }}>
-                                                                <i className="fa fa-eye"></i>
+                        <div>
+                            <div className='movies'>
+                                <div className='movies-table'>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th width="30%">File Name</th>
+                                                <th width="30%">Times in Cycle</th>
+                                                <th width="15%">Active</th>
+                                                <th width="30%">Preview</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {
+                                                movies &&
+                                                movies.map((m, index) => (
+                                                    <tr key={`${m.file_name}-${index}`}>
+                                                        <td>
+                                                            {m.file_name}
+                                                        </td>
+                                                        <td>
+                                                            <select value={m.times} onChange={(e) => {
+                                                                const updatedMovies = [...movies];
+                                                                updatedMovies[index].times = e.target.value;
+                                                                setMovies(updatedMovies);
+                                                            }}>
+                                                                <option value="1">1</option>
+                                                                <option value="2">2</option>
+                                                                <option value="3">3</option>
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <div className='active'>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={m.active}
+                                                                    onChange={() => {
+                                                                        const updatedMovies = [...movies];
+                                                                        updatedMovies[index].active = !updatedMovies[index].active;
+                                                                        setMovies(updatedMovies);
+                                                                    }}
+                                                                />
                                                             </div>
-                                                        </div>
+                                                        </td>
+                                                        <td>
+                                                            <div className='actions'>
+                                                                <div className='font-icon' onClick={() => { previewMovie(m.url) }}>
+                                                                    <i className="fa fa-eye"></i>
+                                                                </div>
+                                                                <div
+                                                                    className={`font-icon ${m.deletable ? '' : 'disabled'}`}
+                                                                    onClick={(m.deletable ? () => { deleteMovie(index, m.file_name, m.subFolder) } : null)}
+                                                                >
+                                                                    <i className="fa fa-trash"></i>
+                                                                </div>
+                                                            </div>
 
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        }
-                                    </tbody>
-                                </table>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className='movie-preview'>
+                                    <video ref={videoRef} controls>
+                                        <source id="videoSrc" src={`${movieFile}`} type="video/mp4" />
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
                             </div>
-                            <div className='movie-preview'>
-                                <video ref={videoRef} controls>
-                                    <source id="videoSrc" src={`${movieFile}`} type="video/mp4" />
-                                    Your browser does not support the video tag.
-                                </video>
+
+                            <div className='upload-wrapper'>
+                                <input
+                                    id='file-select'
+                                    type='file'
+                                    accept=".mp4"
+                                    onChange={fileSelected} style={{ "display": "none" }}
+                                />
+
+                                <CustomButton
+                                    btnData={
+                                        {
+                                            name: "select",
+                                            text: 'Select file',
+                                            type: "button",
+                                            onClick: (!disableUploadButtons ? () => { openFileSelection() } : null),
+                                            style: { 'fontSize': '24px' },
+                                            noHover: disableUploadButtons,
+                                            disabled: disableUploadButtons
+                                        }
+                                    }
+                                />
+
+                                <div className='progress-wrapper'>
+                                    <div className='upload-progress empty'></div>
+                                    <div className='upload-progress full' style={{ "width": `${progressWidth}%` }}></div>
+                                    <div className='upload-progress file-name'>{file?.name ?? ''}</div>
+                                </div>
+
+                                <CustomButton
+                                    btnData={
+                                        {
+                                            name: "upload",
+                                            text: 'Upload file',
+                                            type: "button",
+                                            onClick: ((file && !disableUploadButtons)? () => { uploadMovie() } : null),
+                                            style: { 'fontSize': '24px' },
+                                            noHover: !file || disableUploadButtons,
+                                            disabled: !file || disableUploadButtons
+                                        }
+                                    }
+                                />
+
+                                <div className='upload-msg'>
+                                    {uploadMsg}
+                                </div>
                             </div>
                         </div>
                     </Section>

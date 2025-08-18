@@ -44,7 +44,7 @@ export function LoginPage() {
             result = await db.login(email, password);
         else
             result = await db.login(autoLoginUser.email, autoLoginUser.password);
-
+        
         if (!result.success)
             setErrMsg(result.message);
         else {
