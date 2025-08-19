@@ -10,7 +10,7 @@ import Loader from '../../../components/Loader'
 
 function MovieArea() {
     const { deviceType } = useDeviceResolution();
-    const {settings } = useSettingsContext();
+    const { settings } = useSettingsContext();
     let movieList = useRef([]);
     let onlineMovieList = useRef({});
     let categoryIndex = useRef(0);
@@ -39,7 +39,7 @@ function MovieArea() {
             let newMoviesList = [];
             let downloadedMoviesInd = 0;
             let allDownloadMoviesLocated = (movieList.current.length === 0);
-            
+
             while (!allMoviesInList || !allDownloadMoviesLocated) {
                 // add download video to list
                 if (downloadedMoviesInd < movieList.current.length) {
@@ -58,9 +58,9 @@ function MovieArea() {
                     if (onlineMovieList.current[c].length > 0) {
                         allMoviesInList = false;
                         newMoviesList.push(onlineMovieList.current[c][0]);
-                        onlineMovieList.current[c].splice(0,1);
+                        onlineMovieList.current[c].splice(0, 1);
                     }
-                })    
+                })
             }
 
             const noDownloadedMoviesToDisplay = (movieList.current.length === 0);
@@ -82,7 +82,7 @@ function MovieArea() {
         const data = await getCategoryMovies(category, pageId);
 
         console.log(data);
-        
+
         if (data.success) {
             if (data.totalMovies >= 10) {
                 onlineMovieList.current[data.category] = [...data.videos];
@@ -101,12 +101,12 @@ function MovieArea() {
         let viewMovies = [];
 
         movieList.current = []; //viewMovies.map(m => m.url);
-        
-        settings.movies.forEach(m => { 
+
+        settings.movies.forEach(m => {
             if (m.active)
-                viewMovies.push({...m});
+                viewMovies.push({ ...m });
         });
-        
+
         let quit = false;
         while (!quit) {
             quit = true;
@@ -132,7 +132,7 @@ function MovieArea() {
         movieIndex.current = (movieIndex.current + 1) % movieList.current.length;
 
         console.log(`Play video ${movieIndex.current + 1} out of ${movieList.current.length} videos`);
-        
+
         if (movieFile === movieList.current[movieIndex.current])
             setForceMovie(forceMovie + 1);
         else
@@ -316,10 +316,10 @@ function NewsInfo() {
     const [onScreenNews, setOnScreenNews] = useState(Array(parseInt(envVar('NEWS_ON_SCREEN'))).fill(''));
     const { deviceType } = useDeviceResolution();
 
-    async function getNews(pageId=null) {
+    async function getNews(pageId = null) {
         const data = await getPageNews(pageId);
 
-        if (data.success) {
+        if (data?.success) {
             nextPageId.current = data.nextPage;
             totalNews.current = data.totalNews;
 
@@ -340,7 +340,7 @@ function NewsInfo() {
         console.log("Total News", allNewsList.current.length);
 
         let currentNews = [];
-        for(let n=0; n<NewsToDisplay; n++) {
+        for (let n = 0; n < NewsToDisplay; n++) {
             if (newsHead.current + n < allNewsList.current.length - 1) {
                 currentNews.push(allNewsList.current[newsHead.current + n]);
             }
@@ -352,22 +352,30 @@ function NewsInfo() {
     }
 
     useEffect(() => {
-        getNews();
+        let nextNewsInterval = null;
 
-        const newsInterval = parseInt(envVar('VITE_NEWS_INTERVAL_IN_MIN')) * 1000 * 60;
+        const init = async () => {
+            getNews();
 
-        const nextNewsInterval = setInterval(() => {
-            if (newsHead.current + (2 * NewsToDisplay) > allNewsList.current.length) {
-                console.log("Get next page data")
-                getNews(nextPageId.current);
-            }
+            const newsInterval = parseInt(envVar('VITE_NEWS_INTERVAL_IN_MIN')) * 1000 * 60;
 
-            displayNews();
-        }, newsInterval);
+            nextNewsInterval = setInterval(() => {
+                if (newsHead.current + (2 * NewsToDisplay) > allNewsList.current.length) {
+                    console.log("Get next page data")
+                    getNews(nextPageId.current);
+                }
+
+                if (totalNews.current > 0)
+                    displayNews();
+
+            }, newsInterval);
+        }
+
+        init();
 
         return () => {
             clearInterval(nextNewsInterval);
-        };        
+        };
     }, [])
 
     return (
