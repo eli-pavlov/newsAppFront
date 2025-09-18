@@ -1,18 +1,24 @@
-import { envVar } from "../utils/env";
+import { envVar, setEnvVarsFromServer } from "../utils/env";
 import { getCookie, AUTH_COOKIE_NAME } from '../utils/cookies'
-import { setEnvVarsFromServer } from "../utils/env";
+import axios from "axios";
 
 class DB_SERVER {
     constructor() {
-        this.serverUrl=envVar('SERVER_URL') || window.location.href;
+        this.serverUrl = envVar('SERVER_URL') || window.location.href;
+
+        this.axios = axios.create({
+            validateStatus: () => true // Always resolve, never reject for HTTP codes
+        });
     }
 
-    createFetch(urlParams, method, body=null, addToken=false) {
+    async createFetch(urlParams, method, body = null, addToken = false, headers = null, stringifyBody = true, onUploadProgressCB = null) {
         const apiUrl = `${this.serverUrl}${urlParams}`;
 
-        let headers = {
-            'Content-Type': 'application/json',
-        };
+        if (!headers) {
+            headers = { // default
+                'Content-Type': 'application/json',
+            };
+        }
 
         if (addToken) {
             const accessToken = getCookie(AUTH_COOKIE_NAME);
@@ -20,42 +26,59 @@ class DB_SERVER {
         }
 
         let requestParams = {
+            url: apiUrl,
             method: method,
-            headers: headers,
         }
+
+        if (Object.keys(headers).length > 0)
+            requestParams['headers'] = headers;
 
         if (body) {
-            requestParams['body'] = JSON.stringify(body);
+            if (stringifyBody)
+                requestParams['data'] = JSON.stringify(body);
+            else
+                requestParams['data'] = body;
         }
 
-        return fetch(apiUrl, requestParams);
+        if (onUploadProgressCB) {
+            requestParams['onUploadProgress'] = onUploadProgressCB;
+        }
+
+        let result = null;
+        try {
+            result = await this.axios(requestParams);
+
+            return result.data;
+        }
+        catch (e) {
+            return { success: false };
+        }
     }
 
     defaultSettings() {
         return {
-            'colors_theme':'light',
-            'title':'מיידעון - מערכת מידע אישית',
-            'footer_messages':[
-                {id:0, msg:'לא הוגדרו עדיין הודעות', active:1},
+            'colors_theme': 'light',
+            'title': 'מיידעון - מערכת מידע אישית',
+            'footer_messages': [
+                { id: 0, msg: 'לא הוגדרו עדיין הודעות', active: 1 },
             ],
-            'movies':[],
-            'online_movies_categories':[],
+            'movies': [],
+            'online_movies_categories': [],
         }
     }
 
     async available() {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/db/available', 'get');
-                const response = await result.json();
+                const response = await this.createFetch('/db/available', 'get');
 
                 if (response.success)
-                    resolve({success:true});
+                    resolve({ success: true });
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -63,19 +86,18 @@ class DB_SERVER {
     async getEnvVariables() {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/config', 'get');
-                const response = await result.json();
+                const response = await this.createFetch('/config', 'get');
 
                 if (response.success) {
                     setEnvVarsFromServer(response.data);
-                    
-                    resolve({success:true});
+
+                    resolve({ success: true });
                 }
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -83,13 +105,12 @@ class DB_SERVER {
     async verify() {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/auth/verify', 'get', null, true);
-                const response = await result.json();
+                const response = await this.createFetch('/auth/verify', 'get', null, true);
 
                 resolve(response);
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -97,40 +118,38 @@ class DB_SERVER {
     async login(email, password) {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/auth/login', 'post', {email:email, password:password});
-                const response = await result.json();
+                const response = await this.createFetch('/auth/login', 'post', { email: email, password: password });
 
                 if (response.success)
                     resolve(response);
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
 
-    async getSettings(user=null) {
+    async getSettings(user = null) {
         return new Promise(async (resolve, reject) => {
             try {
-                let result = null;
+                let response = null;
                 if (!user)
-                    result = await this.createFetch('/settings/get', 'get', null, true);
+                    response = await this.createFetch('/settings/get', 'get', null, true);
                 else
-                    result = await this.createFetch('/settings/user', 'post', user, true);
-                const response = await result.json();
+                    response = await this.createFetch('/settings/user', 'post', user, true);
 
                 if (response.success)
-                    resolve({success:true, data:response.data});
+                    resolve({ success: true, data: response.data });
                 else {
                     let settings = this.defaultSettings();
                     settings.movies = response.movies;
-                    resolve({success:true, data:settings});
+                    resolve({ success: true, data: settings });
                 }
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -138,16 +157,15 @@ class DB_SERVER {
     async saveSettings(settings) {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/settings/set', 'post', settings, true);
-                const response = await result.json();
+                const response = await this.createFetch('/settings/set', 'post', settings, true);
 
                 if (response.success)
-                    resolve({success:true, data:settings});
+                    resolve({ success: true, data: settings });
                 else
-                    resolve({success:false, message:response.messsage});
+                    resolve({ success: false, message: response.messsage });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -155,16 +173,15 @@ class DB_SERVER {
     async getAllUsers() {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/user/all', 'get', null, true);
-                const response = await result.json();
+                const response = await this.createFetch('/user/all', 'get', null, true);
 
                 if (response.success)
                     resolve(response);
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -172,16 +189,15 @@ class DB_SERVER {
     async getProtectedUsers() {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/user/protected', 'get');
-                const response = await result.json();
+                const response = await this.createFetch('/user/protected', 'get');
 
                 if (response.success)
                     resolve(response);
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -189,16 +205,15 @@ class DB_SERVER {
     async addUser(userData) {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/user/add', 'post', userData, true);
-                const response = await result.json();
+                const response = await this.createFetch('/user/add', 'post', userData, true);
 
                 if (response.success)
                     resolve(response);
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
             }
         })
     }
@@ -206,16 +221,51 @@ class DB_SERVER {
     async deleteUser(email) {
         return new Promise(async (resolve, reject) => {
             try {
-                const result = await this.createFetch('/user/delete', 'post', {email}, true);
-                const response = await result.json();
+                const response = await this.createFetch('/user/delete', 'post', { email }, true);
 
                 if (response.success)
                     resolve(response);
                 else
-                    resolve({success:false, message:response.message});
+                    resolve({ success: false, message: response.message });
             }
             catch (e) {
-                reject({success:false, message:e.message})
+                reject({ success: false, message: e.message })
+            }
+        })
+    }
+
+    async deleteMovie(fileName, subFolder) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const response = await this.createFetch('/files/delete', 'post', { fileName, subFolder }, true);
+
+                if (response.success)
+                    resolve(response);
+                else
+                    resolve({ success: false, message: response.message });
+            }
+            catch (e) {
+                reject({ success: false, message: e.message })
+            }
+        })
+    }
+
+    async uploadMovie(file, onUploadProgressCB, subFolder=null) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("subFolder", subFolder);
+
+                const response = await this.createFetch('/files/upload', 'post', formData, true, {}, false, onUploadProgressCB);
+
+                if (response.success)
+                    resolve(response);
+                else
+                    resolve({ success: false, message: response.message });
+            }
+            catch (e) {
+                reject({ success: false, message: e.message })
             }
         })
     }

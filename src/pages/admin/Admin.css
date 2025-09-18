@@ -66,7 +66,7 @@ h1 {
     font-size: 24px;
 }
 
-.admin-container .header  {
+.admin-container .header {
     display: flex;
     justify-content: space-between;
     margin-bottom: 24px;
@@ -80,7 +80,8 @@ h1 {
 }
 
 .admin-container .header .icon:hover {
-    transform: scale(1.2);;
+    transform: scale(1.2);
+    ;
 }
 
 .settings-page form {
@@ -219,8 +220,7 @@ td {
     justify-content: space-between;
 }
 
-.tabs-area {
-}
+.tabs-area {}
 
 .tabs {
     display: flex;
@@ -238,13 +238,13 @@ td {
 
 .tab {
     overflow: left;
-    height:30px;
+    height: 30px;
     width: 100px;
     border-bottom: none;
     border-top-left-radius: 12px;
     border-top-right-radius: 12px;
     background-color: lightgrey;
-    color:black;
+    color: black;
     font-size: 24px;
     padding: 12px;
     cursor: pointer;
@@ -275,9 +275,9 @@ td {
 }
 
 .add-user .element {
-    font-size:24px;
+    font-size: 24px;
     margin-right: 12px;
-    padding:8px;
+    padding: 8px;
     border-radius: 8px;
     place-items: unset;
 }
@@ -285,7 +285,7 @@ td {
 .add-user button {
     cursor: pointer;
     background-color: var(--login-btn-color);
-    width:20%;
+    width: 20%;
     margin: auto !important;
 }
 
@@ -296,7 +296,7 @@ td {
 .users-table {
     display: flex;
     justify-content: center;
-    margin-top: 12px;    
+    margin-top: 12px;
 }
 
 .users-table table {
@@ -310,17 +310,17 @@ td {
 }
 
 .add-user-msg.error {
-    color:red;
+    color: red;
 }
 
 .add-user-msg {
-    color:white;
+    color: white;
 }
 
 .movies-categories {
     display: flex;
     flex-wrap: wrap;
-    justify-content:left;
+    justify-content: left;
     margin: 18px;
 }
 
@@ -334,7 +334,7 @@ td {
     background-color: grey;
     cursor: pointer;
     box-sizing: border-box;
-    color:black;
+    color: black;
     opacity: 0.4;
     user-select: none;
 }
@@ -343,4 +343,50 @@ td {
     background-color: white;
     font-weight: bold;
     opacity: 1;
+}
+
+.upload-wrapper {
+    margin-top: 4px;
+    border: 2px solid black;
+    border-radius: 8px;
+    display: flex;
+}
+
+.upload-progress {
+    width: 200px;
+    height: 45px;
+    margin-top: 10px;
+    box-sizing: border-box;
+    border-radius: 8px;
+}
+
+.progress-wrapper {
+    position: relative;
+}
+
+.upload-progress.empty {
+    background-color: white;
+}
+
+.upload-progress.full {
+    background-color: green;
+    position: absolute;
+    top: 0px;
+    width: 0%;
+}
+
+.upload-progress.file-name {
+    position: absolute;
+    top: 0px;
+    left: 4px;
+    white-space: nowrap;
+    overflow-x: hidden;
+    width: 95%;
+    color: black;
+}
+
+.upload-msg {
+    display: flex;
+    align-items: center;
+    color: black;
 }
