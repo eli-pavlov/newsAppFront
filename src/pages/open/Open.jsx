@@ -74,7 +74,7 @@ function OpenPage() {
                         </div>
                     </b>
                     <div>
-                        FROTEND
+                        FRONTEND
                     </div>
                     <b>
                         <div>
