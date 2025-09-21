@@ -4,10 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev":"node ./src/utils/git_info.js",
     "dev": "vite",
     "build-local": "vite build",
-    "prebuild":"node ./src/utils/git_info.js",
     "build": "vite build --mode production",
     "lint": "eslint .",
     "preview": "vite preview"
