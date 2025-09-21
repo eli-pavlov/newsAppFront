@@ -3,21 +3,20 @@ import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'wouter'
 import { useDeviceResolution } from '../../contexts/DeviceResolution';
 import { db } from '../../api/db';
-import gitInfo from '../../../git_info.json';
 
 function OpenPage() {
     const [_, navigate ] = useLocation();
     const { deviceType } = useDeviceResolution();
     const [msg, setMsg] = useState('');
     const [viewGitInfo, setViewGitInfo] = useState(false);
-    const [backendGitInfo, setBackendGitInfo] = useState({branch:"", commit:""});
+    const [gitInfo, setGitInfo] = useState({branch:"", commit:""});
     const openTimer = useRef();
 
     async function dbAvailable() {
         const result = await db.available();
 
         if (result.success) {
-            setBackendGitInfo(result.git);
+            setGitInfo(result.git_info);
             openTimer.current = setTimeout(() => {
                 navigate('/admin');
             }, 3000)
@@ -52,26 +51,30 @@ function OpenPage() {
             }
             {
                 viewGitInfo &&
-                <div className='git-info'><b>
+                <div className='git-info'>
                     <div>
-                        Backend:
+                        BACKEND
                     </div>
+                    <b>
+                        <div>
+                            {`branch: ${gitInfo.backend.branch}`}
+                        </div>
+                        <div>
+                            {`commit: ${gitInfo.backend.commit}`}
+                        </div>
+                    </b>
                     <div>
-                        {`branch: ${backendGitInfo.branch}`}
+                        FROTEND
                     </div>
-                    <div>
-                        {`commit: ${backendGitInfo.commit}`}
-                    </div>
-                    <div>
-                        Frotend:
-                    </div>
-                    <div>
-                        {`branch: ${gitInfo.branch}`}
-                    </div>
-                    <div>
-                        {`commit: ${gitInfo.commit}`}
-                    </div>
-                </b></div>
+                    <b>
+                        <div>
+                            {`branch: ${gitInfo.frontend.branch}`}
+                        </div>
+                        <div>
+                            {`commit: ${gitInfo.frontend.commit}`}
+                        </div>
+                    </b>
+                </div>
             }
         </div>
     )
