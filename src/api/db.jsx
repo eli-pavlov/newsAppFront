@@ -250,24 +250,52 @@ class DB_SERVER {
         })
     }
 
-    async uploadMovie(file, onUploadProgressCB, subFolder=null) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("subFolder", subFolder);
+    // ⬇️ THIS IS THE ONLY METHOD THAT HAS BEEN REVISED ⬇️
+    async uploadMovie(file, onUploadProgressCB) {
+        try {
+            // Step 1: Request a pre-signed URL from our backend
+            const presignResponse = await this.createFetch(
+                '/files/presigned-url',
+                'post',
+                {
+                    fileName: file.name,
+                    contentType: file.type,
+                },
+                true // Authenticated request
+            );
 
-                const response = await this.createFetch('/files/upload', 'post', formData, true, {}, false, onUploadProgressCB);
+            if (!presignResponse.success) {
+                return { success: false, message: presignResponse.message };
+            }
 
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
+            const { preSignedUrl, ...newMovieData } = presignResponse;
+
+            // Step 2: Upload the actual file directly to S3 using a PUT request
+            await axios.put(preSignedUrl, file, {
+                headers: {
+                    'Content-Type': file.type,
+                },
+                onUploadProgress: progressEvent => {
+                    if (onUploadProgressCB) {
+                        // The onUploadProgressCB from your Settings.jsx expects a percentage
+                        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                        onUploadProgressCB(percentCompleted);
+                    }
+                },
+            });
+
+            // If the axios PUT request finishes without an error, the upload was successful.
+            return {
+                success: true,
+                message: 'File uploaded successfully!',
+                data: newMovieData // This contains the final URL and other details
+            };
+
+        } catch (error) {
+            console.error("Upload process failed:", error);
+            const message = error.response ? 'S3 upload failed.' : error.message;
+            return { success: false, message: message };
+        }
     }
 }
 
