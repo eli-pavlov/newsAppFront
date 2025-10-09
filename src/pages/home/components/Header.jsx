@@ -1,35 +1,35 @@
-import '../Home.css'
-import { useDeviceResolution } from '../../../contexts/DeviceResolution';
-import { useSettingsContext } from '../../../contexts/SettingsContext';
-import { useLocation } from 'wouter'
-import { useAuthContext } from '../../../contexts/AuthContext'
-import { deleteCookie, AUTH_COOKIE_NAME } from '../../../utils/cookies';
+import React from 'react';
+import { useSettingsContext } from '../../../contexts/SettingsContext.jsx';
+import { useDeviceContext } from '../../../contexts/DeviceResolution.jsx';
+import { useLocation } from 'wouter';
+import { useAuthContext } from '../../../contexts/AuthContext.jsx';
+// FIX: Using the correct function and constant names from cookies.js
+import { removeCookie, AUTH_USER } from '../../../utils/cookies.js';
 
 function Header() {
-    const {settings } = useSettingsContext();
-    const { deviceType } = useDeviceResolution();
-    const [_, navigate ] = useLocation();
+    const { settings } = useSettingsContext();
+    const { deviceType } = useDeviceContext();
+    const [_, setLocation] = useLocation();
     const { setUser } = useAuthContext();
-    
-    function logout() {
+
+    function handleLogout() {
         setUser(null);
-        deleteCookie(AUTH_COOKIE_NAME)
-        navigate('/login')
+        // FIX: Using the correct function and constant names
+        removeCookie(AUTH_USER);
+        setLocation('/login');
     }
 
     return (
         <div className={`header ${deviceType}`}>
-            <div className={`admin-icon ${deviceType}`} onClick={() => navigate('/admin')}>
+            <div className={`admin-icon ${deviceType}`} onClick={() => setLocation('/admin')}>
                 <i className="fa fa-gear"></i>
             </div>
-            <div className={`logout-icon ${deviceType}`} onClick={ logout }>
+            <div className={`logout-icon ${deviceType}`} onClick={handleLogout}>
                 <i className="fa fa-sign-out"></i>
             </div>
-            <div>
-                {settings.title}
-            </div>
+            <div>{settings.title}</div>
         </div>
-    )
+    );
 }
 
 export default Header;
