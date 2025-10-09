@@ -1,93 +1,69 @@
-import './Open.css'
-import { useEffect, useState, useRef } from 'react';
-import { useLocation } from 'wouter'
-import { useDeviceResolution } from '../../contexts/DeviceResolution';
-import { db } from '../../api/db';
-import { envVar } from '../../utils/env';
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'wouter';
+import { useDeviceContext } from '../../contexts/DeviceResolutionContext';
+import { At } from '../../api/db.jsx'; // FIX: Changed 'db' to 'At' and added .jsx
+import { getEnvVariable } from '../../utils/env.jsx'; // FIX: Added .jsx for consistency
 
-function OpenPage() {
-    const [_, navigate ] = useLocation();
-    const { deviceType } = useDeviceResolution();
-    const [msg, setMsg] = useState('');
-    const [viewGitInfo, setViewGitInfo] = useState(false);
-    const [gitInfo, setGitInfo] = useState(
-        {
-            "back":{"branch":"unknown", commit:"unknown"},
-            "front":{"branch":"unknown", commit:"unknown"}
-        }
-    );
-    const openTimer = useRef();
+function Open() {
+    const [_, setLocation] = useLocation();
+    const { deviceType } = useDeviceContext();
+    const [errorMsg, setErrorMsg] = useState("");
+    const [showGitInfo, setShowGitInfo] = useState(false);
+    const [gitInfo, setGitInfo] = useState({ back: { branch: "unknown", commit: "unknown" }, front: { branch: "unknown", commit: "unknown" } });
+    const timer = useRef();
 
-    async function dbAvailable() {
-        const result = await db.available();
-
+    async function checkDb() {
+        const result = await At.available(); // FIX: Changed 'db' to 'At'
         if (result.success) {
-            const frontendGitInfo = {
-                branch:envVar('VITE_FRONTEND_GIT_BRANCH') || "Unknown", 
-                commit:envVar('VITE_FRONTEND_GIT_COMMIT') || "Unknown"
+            const frontGit = {
+                branch: getEnvVariable("FRONTEND_GIT_BRANCH") || "Unknown",
+                commit: getEnvVariable("FRONTEND_GIT_COMMIT") || "Unknown"
             };
-            setGitInfo({back:result.git_info, front:frontendGitInfo});
-            openTimer.current = setTimeout(() => {
-                navigate('/admin');
-            }, 3000)
-        }
-        else {
+            setGitInfo({ back: result.git_info, front: frontGit });
+            timer.current = setTimeout(() => { setLocation('/admin') }, 3000);
+        } else {
             console.log(result.message);
-            setMsg(result.message);
+            setErrorMsg(result.message);
         }
     }
 
-    function titleClick() {
-        if (viewGitInfo)
-            navigate('/admin');
-        else {
-            clearTimeout(openTimer.current);
-            setViewGitInfo(true);
+    function titleClickHandler() {
+        if (showGitInfo) {
+            setLocation('/admin');
+        } else {
+            clearTimeout(timer.current);
+            setShowGitInfo(true);
         }
     }
 
     useEffect(() => {
-        dbAvailable();
-    }, [])
+        checkDb();
+        // Clear timer on component unmount
+        return () => clearTimeout(timer.current);
+    }, []);
 
     return (
         <div className={`open-page ${deviceType}`}>
-            <div className="title" onClick={titleClick}>
-                <h1>מיידעון</h1>
+            <div className='title' onClick={titleClickHandler}>
+                <h1>NewsApp</h1>
             </div>
-            {
-                msg &&
-                <h3>{msg}</h3>
-            }
-            {
-                viewGitInfo &&
+            {errorMsg && <h3>{errorMsg}</h3>}
+            {showGitInfo &&
                 <div className='git-info'>
-                    <div>
-                        BACKEND
-                    </div>
+                    <div>BACKEND</div>
                     <b>
-                        <div>
-                            {`branch: ${gitInfo.back.branch}`}
-                        </div>
-                        <div>
-                            {`commit: ${gitInfo.back.commit}`}
-                        </div>
+                        <div>{`branch: ${gitInfo.back.branch}`}</div>
+                        <div>{`commit: ${gitInfo.back.commit}`}</div>
                     </b>
-                    <div>
-                        FRONTEND
-                    </div>
+                    <div>FRONTEND</div>
                     <b>
-                        <div>
-                            {`branch: ${gitInfo.front.branch}`}
-                        </div>
-                        <div>
-                            {`commit: ${gitInfo.front.commit}`}
-                        </div>
+                        <div>{`branch: ${gitInfo.front.branch}`}</div>
+                        <div>{`commit: ${gitInfo.front.commit}`}</div>
                     </b>
                 </div>
             }
         </div>
-    )
+    );
 }
 
-export default OpenPage;
+export default Open;
