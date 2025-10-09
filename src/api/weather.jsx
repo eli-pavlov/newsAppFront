@@ -2,12 +2,14 @@ import { getEnvVariable } from "../utils/env.jsx";
 
 export default async function getWeatherData() {
     try {
-        const url = getEnvVariable("WEATHER_API_URL");
+        const url = getEnvVariable("VITE_WEATHER_API_URL");
+
         if (!url) {
             throw new Error("Weather API URL is not defined.");
         }
         
         const response = await fetch(url);
+        
         if (!response.ok) {
             throw new Error(`Weather API request failed with status ${response.status}`);
         }
