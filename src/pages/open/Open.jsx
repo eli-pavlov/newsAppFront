@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useDeviceContext } from '../../contexts/DeviceResolution.jsx'; // FIX: Corrected the file extension
+// FIX: Changed the imported function name to useDeviceResolution
+import { useDeviceResolution } from '../../contexts/DeviceResolution.jsx';
 import { At } from '../../api/db.jsx';
 import { getEnvVariable } from '../../utils/env.jsx';
 
 function Open() {
     const [_, setLocation] = useLocation();
-    const { deviceType } = useDeviceContext();
+    // FIX: Changed the hook name to useDeviceResolution
+    const { deviceType } = useDeviceResolution();
     const [errorMsg, setErrorMsg] = useState("");
     const [showGitInfo, setShowGitInfo] = useState(false);
     const [gitInfo, setGitInfo] = useState({ back: { branch: "unknown", commit: "unknown" }, front: { branch: "unknown", commit: "unknown" } });
