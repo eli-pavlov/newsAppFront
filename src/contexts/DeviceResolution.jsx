@@ -3,7 +3,7 @@ import { useMediaQuery } from 'react-responsive';
 
 const DeviceContext = createContext(null);
 
-export const DeviceResolution = ({ children }) => {
+export const DeviceResolutionProvider = ({ children }) => {
     const isDesktop = useMediaQuery({ minWidth: 1025 });
     const isTablet = useMediaQuery({ minWidth: 601, maxWidth: 1024 });
     const isMobile = useMediaQuery({ maxWidth: 600 });
