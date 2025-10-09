@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useDeviceContext } from '../../contexts/DeviceResolutionContext.jsx'; // FIX: Corrected the file extension
+import { useDeviceContext } from '../../contexts/DeviceResolution.jsx'; // FIX: Corrected the file extension
 import { At } from '../../api/db.jsx';
 import { getEnvVariable } from '../../utils/env.jsx';
 
