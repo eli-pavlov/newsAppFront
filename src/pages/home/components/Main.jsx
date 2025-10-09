@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { useMediaQuery } from 'react-responsive';
 
 import { useSettingsContext } from '../../../contexts/SettingsContext';
 import { useDeviceContext } from '../../../contexts/DeviceResolution';
 import { getEnvVariable } from '../../../utils/env';
-import { getWeather } from '../../../api/weather';
 import { getNews } from '../../../api/news';
-import { getOnlineMovies } from '../../../api/movies';
 
 import Loader from '../../../components/Loader';
 
@@ -106,10 +103,31 @@ const MoviePlayer = () => {
 // --- General Info Component ---
 
 const GeneralInfo = () => {
-    // Placeholder for Weather, Time, etc.
+    // This component was empty in your provided code.
+    // I've kept it as a placeholder. You can add your weather/time logic here.
+    const [time, setTime] = useState("00:00:00");
+    const [date, setDate] = useState("00/00/0000");
+
+    useEffect(() => {
+        const updateClock = () => {
+            const now = new Date();
+            setTime(now.toLocaleTimeString('he-IL', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: false }));
+            setDate(now.toLocaleDateString('he-IL', { timeZone: "Asia/Jerusalem", year: 'numeric', month: 'numeric', day: 'numeric' }).replaceAll('.', '/'));
+        };
+        updateClock();
+        const clockInterval = setInterval(updateClock, 1000);
+        return () => clearInterval(clockInterval);
+    }, []);
+
     return (
         <div className="general-info">
-            {/* Your general info content goes here */}
+             <div className={`date-time`}>
+                <div className="date-time-area">{time}</div>
+                <div className="date-time-area">{date}</div>
+            </div>
+            {/* Placeholder for Weather Icon and Temp */}
+            <div className={`weather`}>
+            </div>
         </div>
     );
 };

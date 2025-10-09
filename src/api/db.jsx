@@ -1,181 +1,164 @@
-import axios from "axios";
-import { getEnvVariable } from "../utils/env.jsx"; // Correctly imports the function
-import { AUTH_USER, getCookie } from "../utils/cookies.js";
-import { defaultSettings as getDefaultSettings } from "../utils/settings.jsx";
+import axios from 'axios';
+import { getEnvVariable } from '../utils/env';
+import { getCookie } from '../utils/cookies';
 
-class Server {
+class Db {
     constructor() {
-        this.serverUrl = getEnvVariable("SERVER_URL") || window.location.origin;
+        this.serverUrl = getEnvVariable('SERVER_URL') || window.location.origin;
         this.axios = axios.create({
-            validateStatus: () => true
+            validateStatus: () => true,
         });
     }
 
-    async _createFetch(path, method, data = null, withAuth = false, headers = null, isJson = true, onUploadProgress = null) {
+    async createFetch(path, method, data = null, auth = false, headers = null, isFormData = false, onUploadProgress = null) {
         const url = `${this.serverUrl}${path}`;
-        
+
         if (!headers) {
             headers = { "Content-Type": "application/json" };
         }
 
-        if (withAuth) {
-            const token = getCookie(AUTH_USER);
-            if(token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
+        if (auth) {
+            const token = getCookie('authuser');
+            headers.Authorization = `Bearer ${token}`;
         }
 
-        let config = { url, method };
+        let config = {
+            url,
+            method,
+        };
 
-        if (Object.keys(headers).length > 0) config.headers = headers;
-        if (data) config.data = isJson ? JSON.stringify(data) : data;
-        if (onUploadProgress) config.onUploadProgress = onUploadProgress;
+        if (Object.keys(headers).length > 0) {
+            config.headers = headers;
+        }
 
+        if (data) {
+            config.data = isFormData ? data : JSON.stringify(data);
+        }
+
+        if (onUploadProgress) {
+            config.onUploadProgress = onUploadProgress;
+        }
+
+        let response = null;
         try {
-            const response = await this.axios(config);
+            response = await this.axios(config);
             return response.data;
-        } catch (error) {
-            return { success: false, message: error.message };
+        } catch (e) {
+            return { success: false };
         }
     }
 
-    // --- START: PRE-SIGNED URL METHODS ---
-
-    async _generateUploadUrl(fileName, contentType) {
-        return await this._createFetch('/files/generate-presigned-url', 'post', { fileName, contentType }, true);
-    }
-    
-    async _finalizeUpload(objectKey, fileName, contentType) {
-        return await this._createFetch('/files/finalize-upload', 'post', { objectKey, fileName, contentType }, true);
-    }
-
-    async uploadFileWithPresignedUrl(file, onUploadProgress) {
-        try {
-            onUploadProgress(5);
-            const presignResponse = await this._generateUploadUrl(file.name, file.type);
-            if (!presignResponse.success) {
-                throw new Error(presignResponse.message || "Could not get an upload URL.");
-            }
-            const { uploadUrl, objectKey } = presignResponse;
-            onUploadProgress(10);
-
-            await axios.put(uploadUrl, file, {
-                headers: { 'Content-Type': file.type },
-                onUploadProgress: progressEvent => {
-                    const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                    onUploadProgress(10 + (percentCompleted * 0.85)); 
-                }
-            });
-            onUploadProgress(95);
-
-            const finalizeResponse = await this._finalizeUpload(objectKey, file.name, file.type);
-            onUploadProgress(100);
-            return finalizeResponse;
-
-        } catch (error) {
-            console.error("Upload failed:", error);
-            onUploadProgress(0);
-            const message = error.response?.data?.message || error.message;
-            return { success: false, message };
-        }
+    defaultSettings = () => {
+        return {
+            colors_theme: 'light',
+            title: "News App - Personalized Information System",
+            footer_messages: [{ id: 0, msg: "No messages have been set yet", active: true }],
+            movies: [],
+            online_movies_categories: []
+        };
     }
 
-    async deleteMovie(objectKey) {
-        return await this._createFetch('/files/delete', 'post', { objectKey }, true);
-    }
-
-    // --- END: PRE-SIGNED URL METHODS ---
-
-
-    // --- Other existing methods ---
+    // GENERAL
     async available() {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch("/db/available", "get");
-                resolve(result.success ? result : { success: false, message: result.message });
-            }
-            catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        })
+        return await this.createFetch('/db/available', 'get');
     }
 
     async getEnvVariables() {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch("/config", "get");
-                resolve(result.success ? { success: true, data: result.data } : { success: false, message: result.message });
-            }
-            catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        })
+        return await this.createFetch('/config', 'get');
     }
 
+    // AUTH
     async verify() {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch('/auth/verify', 'get', null, true);
-                resolve(result);
-            }
-            catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        })
+        return await this.createFetch('/auth/verify', 'get', null, true);
     }
 
     async login(email, password) {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch('/auth/login', 'post', { email, password });
-                resolve(result.success ? result : { success: false, message: result.message });
-            } catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        });
+        return await this.createFetch('/auth/login', 'post', { email, password });
     }
 
+    // SETTINGS
     async getSettings(user = null) {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch(user ? '/settings/user' : '/settings/get', user ? 'post' : 'get', user, true);
-                if (result.success) {
-                    resolve({ success: true, data: result.data });
-                } else {
-                    let defaultSettings = getDefaultSettings();
-                    defaultSettings.movies = result.movies || [];
-                    resolve({ success: true, data: defaultSettings });
-                }
-            }
-            catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        });
+        const path = user ? '/settings/user' : '/settings/get';
+        const method = user ? 'post' : 'get';
+        const res = await this.createFetch(path, method, user, true);
+
+        if (res.success) {
+            return { success: true, data: res.data };
+        }
+        
+        const defaultData = this.defaultSettings();
+        defaultData.movies = res.movies || [];
+        return { success: true, data: defaultData };
     }
 
     async saveSettings(data) {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch('/settings/set', 'post', data, true);
-                resolve(result.success ? { success: true, data: data } : { success: false, message: result.message });
-            } catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        });
+        return await this.createFetch('/settings/set', 'post', data, true);
     }
 
+    // USERS
     async getAllUsers() {
-        return new Promise(async (resolve) => {
-            try {
-                const result = await this._createFetch('/user/all', 'get', null, true);
-                resolve(result);
-            } catch (e) {
-                resolve({ success: false, message: e.message });
-            }
-        });
+        return await this.createFetch('/user/all', 'get', null, true);
     }
-    
-    // ... include any other methods like getProtectedUsers, addUser, deleteUser
+
+    async getProtectedUsers() {
+        return await this.createFetch('/user/protected', 'get');
+    }
+
+    async addUser(data) {
+        return await this.createFetch('/user/add', 'post', data, true);
+    }
+
+    async deleteUser(email) {
+        return await this.createFetch('/user/delete', 'post', { email }, true);
+    }
+
+    // FILES / MOVIES
+    async uploadMovie(file, progressHandler, subFolder = null) {
+        try {
+            // 1. Get pre-signed URL from server
+            const presignResponse = await this.createFetch('/files/generate-presigned-url', 'post', {
+                fileName: file.name,
+                contentType: file.type,
+            }, true);
+
+            if (!presignResponse.success) {
+                return presignResponse;
+            }
+
+            const { uploadUrl, objectKey } = presignResponse.data;
+
+            // 2. Upload file directly to S3
+            const uploadResponse = await axios.put(uploadUrl, file, {
+                onUploadProgress: progressHandler,
+                headers: { 'Content-Type': file.type }
+            });
+
+            if (uploadResponse.status !== 200) {
+                return { success: false, message: 'File upload to S3 failed.' };
+            }
+
+            // 3. Finalize upload with our server
+            const finalizeResponse = await this.createFetch('/files/finalize-upload', 'post', {
+                objectKey,
+                fileName: file.name,
+                contentType: file.type
+            }, true);
+            
+            if (finalizeResponse.success) {
+                 return { success: true, message: 'Upload successful!', ...finalizeResponse.data };
+            } else {
+                return finalizeResponse;
+            }
+
+        } catch (e) {
+            return { success: false, message: e.message };
+        }
+    }
+
+    async deleteFile(objectKey) {
+        return await this.createFetch('/files/delete', 'post', { objectKey }, true);
+    }
 }
 
-export const At = new Server();
+const At = new Db();
+export default At;
