@@ -20,7 +20,7 @@ function Settings({ cancelFunc, user }) {
     const [isTitleDisabled, setIsTitleDisabled] = useState(true);
     const [footerMessages, setFooterMessages] = useState([]);
     const [colorsTheme, setColorsTheme] = useState('');
-    const { setColorsTheme, settings, setSettings } = useSettingsContext();
+    const { setColorsTheme: setGlobalColorsTheme, settings, setSettings } = useSettingsContext();
     const [movies, setMovies] = useState([]);
     const [previewUrl, setPreviewUrl] = useState(null);
     const videoRef = useRef(null);
