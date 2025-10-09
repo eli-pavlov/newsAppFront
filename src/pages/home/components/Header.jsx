@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSettingsContext } from '../../../contexts/SettingsContext.jsx';
-// FIX: Changed the imported function name to useDeviceResolution
+// FIX: Using the correct hook name
 import { useDeviceResolution } from '../../../contexts/DeviceResolution.jsx';
 import { useLocation } from 'wouter';
 import { useAuthContext } from '../../../contexts/AuthContext.jsx';
@@ -8,7 +8,7 @@ import { removeCookie, AUTH_USER } from '../../../utils/cookies.js';
 
 function Header() {
     const { settings } = useSettingsContext();
-    // FIX: Changed the hook name to useDeviceResolution
+    // FIX: Using the correct hook name
     const { deviceType } = useDeviceResolution(); 
     const [_, setLocation] = useLocation();
     const { user, setUser } = useAuthContext();

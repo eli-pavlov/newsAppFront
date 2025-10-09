@@ -1,204 +1,402 @@
-import { useState, useEffect, useRef } from 'react';
-import { useMediaQuery } from 'react-responsive';
-
+import '../Home.css'
+import { useEffect, useState, useRef } from 'react'
+import { useDeviceResolution } from '../../../contexts/DeviceResolution.jsx';
+import getWeatherData from '../../../api/weather';
+import getPageNews from '../../../api/news';
+import getCategoryMovies from '../../../api/movies';
 import { useSettingsContext } from '../../../contexts/SettingsContext';
-import { useDeviceContext } from '../../../contexts/DeviceResolution';
-import { getEnvVariable } from '../../../utils/env';
-import { getWeather } from '../../../api/weather';
-import { getNews } from '../../../api/news';
-import { getOnlineMovies } from '../../../api/movies';
+import { envVar } from '../../../utils/env';
+import Loader from '../../../components/Loader'
 
-import Loader from '../../../components/Loader';
-
-const MoviePlayer = () => {
-    const { deviceType } = useDeviceContext();
+function MovieArea() {
+    const { deviceType } = useDeviceResolution();
     const { settings } = useSettingsContext();
-    let moviesList = useRef([]);
-    let onlineMovies = useRef({});
-    let onlineMoviesCategoryIndex = useRef(0);
-    const videoIndex = useRef(-1);
-    const [videoSrc, setVideoSrc] = useState(null);
-    const [videoKey, setVideoKey] = useState(0); // Used to force re-render
+    let movieList = useRef([]);
+    let onlineMovieList = useRef({});
+    let categoryIndex = useRef(0);
+
+    const movieIndex = useRef(-1);
+    const [movieFile, setMovieFile] = useState(null);
+    const [forceMovie, setForceMovie] = useState(0);
+
     const videoRef = useRef(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [viewLoader, setViewLoader] = useState(false);
 
-    // FIX #1: Added dependencies to useEffect to update playlist when settings change
-    useEffect(() => {
-        const categories = settings.online_movies_categories || [];
-        if(categories.length > 0) {
-            getOnlineMoviesCycle();
+    function getNextCategoryMovies() {
+        if (categoryIndex.current < settings.online_movies_categories.length) {
+            if (settings.online_movies_categories[categoryIndex.current].selected)
+                getCategoryMoviesList(settings.online_movies_categories[categoryIndex.current].name);
+            else {
+                categoryIndex.current++;
+                getNextCategoryMovies();
+            }
         }
-        buildMoviesCycle();
-    }, [settings.movies, settings.online_movies_categories]); 
-    // END FIX #1
+        else {
+            if (Object.keys(onlineMovieList.current).length === 0)
+                return;
 
-    useEffect(() => {
-        const videoElement = videoRef.current;
-        if (!videoElement || videoSrc === "") return;
-        
-        let handleVideoEnd = null;
-        
-        const handleLoadedData = () => {
-            videoElement.removeEventListener('loadeddata', handleLoadedData);
-            setIsLoading(false);
-            videoElement.muted = true;
-            videoElement.play().catch(error => console.warn("Autoplay failed:", error));
-            handleVideoEnd = () => {
-                videoElement.removeEventListener('ended', handleVideoEnd);
-                playNextMovie();
-            };
-            videoElement.addEventListener('ended', handleVideoEnd);
-        };
-        
-        videoElement.addEventListener('loadeddata', handleLoadedData);
-        videoElement.load();
-        
-        return () => {
-            videoElement.removeEventListener('loadeddata', handleLoadedData);
-            if(handleVideoEnd) {
-                videoElement.removeEventListener('ended', handleVideoEnd);
+            let allMoviesInList = false;
+            let newMoviesList = [];
+            let downloadedMoviesInd = 0;
+            let allDownloadMoviesLocated = (movieList.current.length === 0);
+
+            while (!allMoviesInList || !allDownloadMoviesLocated) {
+                // add download video to list
+                if (downloadedMoviesInd < movieList.current.length) {
+                    newMoviesList.push(movieList.current[downloadedMoviesInd]);
+                    downloadedMoviesInd++;
+
+                    if (downloadedMoviesInd === movieList.current.length) {
+                        allDownloadMoviesLocated = true;
+                        downloadedMoviesInd = 0;
+                    }
+                }
+
+                // add online video to list
+                allMoviesInList = true;
+                Object.keys(onlineMovieList.current).forEach(c => {
+                    if (onlineMovieList.current[c].length > 0) {
+                        allMoviesInList = false;
+                        newMoviesList.push(onlineMovieList.current[c][0]);
+                        onlineMovieList.current[c].splice(0, 1);
+                    }
+                })
             }
-        };
-    }, [videoSrc, videoKey]);
-    
-    // ... (Your other functions like getOnlineMoviesCycle, buildMoviesCycle remain the same)
 
-    const buildMoviesCycle = () => {
-        let moviesInCycle = [];
-        moviesList.current = [];
-        const localMovies = settings.movies || [];
+            const noDownloadedMoviesToDisplay = (movieList.current.length === 0);
 
-        localMovies.forEach(item => {
-            if (item.active) {
-                moviesInCycle.push({ ...item });
+            movieList.current = [...newMoviesList];
+
+            if (noDownloadedMoviesToDisplay) {
+                nextMovie();
             }
+        }
+    }
+
+    async function getCategoryMoviesList(category, pageId = null) {
+        if (!pageId)
+            pageId = Math.floor(Math.random() * 50);
+
+        console.log(`Get online videos for category ${category}`);
+
+        const data = await getCategoryMovies(category, pageId);
+
+        console.log(data);
+
+        if (data.success) {
+            if (data.totalMovies >= 10) {
+                onlineMovieList.current[data.category] = [...data.videos];
+                categoryIndex.current++;
+                getNextCategoryMovies();
+            }
+            else {
+                // try to find a new page with at least 10 videos
+                pageId = Math.max(1, Math.floor(data.pageId / 2));
+                getCategoryMoviesList(data.category, pageId)
+            }
+        }
+    }
+
+    function initMovies() {
+        let viewMovies = [];
+
+        movieList.current = []; //viewMovies.map(m => m.url);
+
+        settings.movies.forEach(m => {
+            if (m.active)
+                viewMovies.push({ ...m });
         });
 
-        let isEmpty = true;
-        while (isEmpty === false) {
-            isEmpty = true;
-            moviesInCycle.forEach(item => {
-                let times = parseInt(item.times);
-                if (times > 0) {
-                    isEmpty = false;
-                    moviesList.current.push(item.url);
-                    item.times = times - 1;
+        let quit = false;
+        while (!quit) {
+            quit = true;
+            viewMovies.forEach(m => {
+                let t = parseInt(m.times);
+                if (t > 0) {
+                    quit = false;
+                    movieList.current.push(m.url);
+                    m.times = t - 1;
                 }
-            });
+            })
         }
-        playNextMovie();
+
+        nextMovie();
     }
-    
-    const playNextMovie = () => {
-        if (moviesList.current.length === 0) return;
-        setIsLoading(true);
-        videoIndex.current = (videoIndex.current + 1) % moviesList.current.length;
-        const nextVideo = moviesList.current[videoIndex.current];
-        if (videoSrc === nextVideo) {
-            setVideoKey(prevKey => prevKey + 1);
-        } else {
-            setVideoSrc(nextVideo);
-        }
-    };
+
+    function nextMovie() {
+        if (movieList.current.length === 0)
+            return;
+
+        setViewLoader(true);
+
+        movieIndex.current = (movieIndex.current + 1) % movieList.current.length;
+
+        console.log(`Play video ${movieIndex.current + 1} out of ${movieList.current.length} videos`);
+
+        if (movieFile === movieList.current[movieIndex.current])
+            setForceMovie(forceMovie + 1);
+        else
+            setMovieFile(movieList.current[movieIndex.current]);
+    }
+
+    useEffect(() => {
+        getNextCategoryMovies();
+        initMovies();
+    }, [])
+
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        if (movieFile === '')
+            return;
+
+        let onVideoEnd = null;
+
+        video.load();
+
+        const handleLoaded = () => {
+            video.removeEventListener("loadeddata", handleLoaded);
+
+            setViewLoader(false);
+
+            video.muted = true;
+            video.play().catch(err => console.warn("Autoplay failed:", err));
+
+            onVideoEnd = () => {
+                video.removeEventListener('ended', onVideoEnd);
+                nextMovie();
+            };
+
+            video.addEventListener('ended', onVideoEnd);
+        };
+
+        video.addEventListener("loadeddata", handleLoaded);
+
+        return () => {
+            video.removeEventListener("loadeddata", handleLoaded);
+            if (onVideoEnd)
+                video.removeEventListener('ended', onVideoEnd);
+        };
+    }, [movieFile, forceMovie])
 
     return (
         <div className="movie-container">
-            {isLoading && <div className="movie-loader"><Loader /></div>}
-            {videoSrc && (
-                <video ref={videoRef} className={`movie ${deviceType}`} key={`${videoSrc}-${videoKey}`}>
-                    <source id="videoSrc" src={videoSrc} type="video/mp4" />
+            {
+                viewLoader &&
+                <div className='movie-loader'>
+                    <Loader />
+                </div>
+            }
+            {
+                movieFile &&
+                <video ref={videoRef} className={`movie ${deviceType}`}>
+                    <source id="videoSrc" src={`${movieFile}`} type="video/mp4" />
                     Your browser does not support the video tag.
                 </video>
-            )}
+            }
         </div>
-    );
-};
+    )
+}
 
-const GeneralInfo = () => {
-    // ... (This component appears correct, no changes needed)
-};
+function GeneralInfo() {
+    const [time, setTime] = useState('00:00:00');
+    const [date, setDate] = useState('00/00/0000');
+    const [weatherText, setWeatherText] = useState(null);
+    const [weatherIcon, setWeatherIcon] = useState(null);
+    const { deviceType } = useDeviceResolution();
 
-const NewsCard = ({ text }) => {
-    // ... (This component appears correct, no changes needed)
-};
+    async function getTempreture() {
+        const data = await getWeatherData();
 
-const News = () => {
-    const newsList = useRef([]);
-    const pageId = useRef(0);
-    const totalNews = useRef(0);
-    const newsIndex = useRef(0);
-    const newsOnScreen = getEnvVariable('NEWS_ON_SCREEN');
-    const [newsItems, setNewsItems] = useState(Array(parseInt(newsOnScreen)).fill({ title: '', id: null }));
-    const { deviceType } = useDeviceContext();
-
-    const getNewsData = async (page = null) => {
-        const result = await getNews(page);
-        if (result?.success) {
-            pageId.current = result.nextPage;
-            totalNews.current = result.totalNews;
-            // FIX #2: Store a unique identifier for each news article
-            result.data.forEach(article => {
-                newsList.current.push({
-                    title: article.title,
-                    id: article.article_id || article.link // Use a unique field from the API
-                });
-            });
-            if (!page) { // First time loading
-                updateNewsOnScreen();
-            }
+        if (data.success) {
+            setWeatherText(data.data.current.temp_c);
+            setWeatherIcon(data.data.current.condition.icon);
         }
-    };
+    }
 
-    const updateNewsOnScreen = () => {
-        let items = [];
-        for (let i = 0; i < newsOnScreen; i++) {
-            if (newsIndex.current + i < newsList.current.length - 1) {
-                items.push(newsList.current[newsIndex.current + i]);
-            }
-        }
-        setNewsItems(items);
-        newsIndex.current += (items.length - 1);
-    };
+    function updateTime() {
+        const now = new Date();
+        const newTime = now.toLocaleTimeString('he-IL', {
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        setTime(newTime);
+    }
+
+    function updateDate() {
+        const now = new Date();
+        const newDate = now.toLocaleDateString('he-IL', {
+            timeZone: 'Asia/Jerusalem',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric'
+        });
+        setDate(newDate.replaceAll('.', '/'));
+    }
 
     useEffect(() => {
-        let interval = null;
-        (async () => {
-            await getNewsData();
-            const intervalTime = parseInt(getEnvVariable('VITE_NEWS_INTERVAL_IN_MIN')) * 1000 * 60;
-            interval = setInterval(() => {
-                if (newsIndex.current + (2 * newsOnScreen) > newsList.current.length) {
-                    getNewsData(pageId.current);
+        updateTime();
+        updateDate();
+        getTempreture();
+
+        const timeInterval = setInterval(() => {
+            updateTime();
+        }, 1000);
+
+        const dateInterval = setInterval(() => {
+            updateDate();
+        }, 1000 * 60);
+
+        const weatherInterval = setInterval(() => {
+            getTempreture();
+        }, parseInt(envVar('VITE_WEATHER_INTERVAL_IN_MIN')) * 1000 * 60);
+
+        return () => {
+            clearInterval(timeInterval);
+            clearInterval(dateInterval);
+            clearInterval(weatherInterval);
+        };
+    }, [])
+
+    return (
+        <div className={`general-info ${deviceType}`}>
+            <div className={`date-time ${deviceType}`}>
+                <div className='date-time-area'>{time}</div>
+                <div className='date-time-area'>{date}</div>
+            </div>
+
+            <div className={`weather ${deviceType}`}>
+                <div>{weatherText}°</div>
+                {
+                    weatherIcon &&
+                    <img src={weatherIcon} />
                 }
-                if (totalNews.current > 0) {
-                    updateNewsOnScreen();
+            </div>
+        </div>
+    )
+}
+
+function NewsCard({ text }) {
+    const [viewLoader, setViewLoader] = useState(true);
+
+    useEffect(() => {
+        setViewLoader(true);
+        setTimeout(() => {
+            setViewLoader(false);
+        }, 1000);
+    }, [text])
+
+    return (
+        <>
+            <div className={`news-card cards${envVar('NEWS_ON_SCREEN')}`}>
+                {
+                    viewLoader &&
+                    <Loader />
                 }
-            }, intervalTime);
-        })();
-        return () => { clearInterval(interval) };
-    }, []);
+                {
+                    !viewLoader &&
+                    <h4>{text}</h4>
+                }
+            </div>
+        </>
+    )
+}
+
+function NewsInfo() {
+    const allNewsList = useRef([]);
+    const newsHead = useRef(0);
+    const totalNews = useRef(0);
+    const nextPageId = useRef(0);
+
+    const NewsToDisplay = envVar('NEWS_ON_SCREEN');
+
+    const [onScreenNews, setOnScreenNews] = useState(Array(parseInt(envVar('NEWS_ON_SCREEN'))).fill(''));
+    const { deviceType } = useDeviceResolution();
+
+    async function getNews(pageId = null) {
+        const data = await getPageNews(pageId);
+
+        if (data?.success) {
+            nextPageId.current = data.nextPage;
+            totalNews.current = data.totalNews;
+
+            data.data.forEach(info => {
+                allNewsList.current.push({ index: allNewsList.current.length, title: info.title });
+            });
+
+            console.log("Total news in list", allNewsList.current.length);
+            if (!pageId)
+                displayNews();
+        }
+    }
+
+    function displayNews() {
+        setOnScreenNews([]);
+
+        console.log("HEAD", newsHead.current);
+        console.log("Total News", allNewsList.current.length);
+
+        let currentNews = [];
+        for (let n = 0; n < NewsToDisplay; n++) {
+            if (newsHead.current + n < allNewsList.current.length - 1) {
+                currentNews.push(allNewsList.current[newsHead.current + n]);
+            }
+        }
+
+        setOnScreenNews(currentNews);
+
+        newsHead.current += currentNews.length - 1;
+    }
+
+    useEffect(() => {
+        let nextNewsInterval = null;
+
+        const init = async () => {
+            getNews();
+
+            const newsInterval = parseInt(envVar('VITE_NEWS_INTERVAL_IN_MIN')) * 1000 * 60;
+
+            nextNewsInterval = setInterval(() => {
+                if (newsHead.current + (2 * NewsToDisplay) > allNewsList.current.length) {
+                    console.log("Get next page data")
+                    getNews(nextPageId.current);
+                }
+
+                if (totalNews.current > 0)
+                    displayNews();
+
+            }, newsInterval);
+        }
+
+        init();
+
+        return () => {
+            clearInterval(nextNewsInterval);
+        };
+    }, [])
 
     return (
         <div className={`news-info ${deviceType}`}>
-            {/* FIX #2: Use the unique 'id' as the key */}
-            {newsItems.map((item, index) => (
-                <NewsCard text={item.title} key={item.id || index} />
-            ))}
+            {
+                onScreenNews.map((n, index) => <NewsCard key={index} text={n.title} />)
+            }
         </div>
-    );
-};
+    )
+}
 
 function Main() {
-    const { deviceType } = useDeviceContext();
+    const { deviceType } = useDeviceResolution();
 
     return (
-        <div className={`main-container ${deviceType}`}>
-            <div className={`movie-area ${deviceType}`}>
-                <MoviePlayer />
-            </div>
-            <div className={`info-area ${deviceType}`}>
-                <GeneralInfo />
-                <News />
-            </div>
+        <div className={`main ${deviceType}`}>
+            <iframe
+                className="news-iframe"
+                src="/news.html"
+                title="news"
+            ></iframe>
         </div>
     );
 }
