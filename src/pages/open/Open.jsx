@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
-import { useDeviceContext } from '../../contexts/DeviceResolutionContext';
-import { At } from '../../api/db.jsx'; // FIX: Changed 'db' to 'At' and added .jsx
-import { getEnvVariable } from '../../utils/env.jsx'; // FIX: Added .jsx for consistency
+import { useDeviceContext } from '../../contexts/DeviceResolutionContext.jsx'; // FIX: Corrected the file extension
+import { At } from '../../api/db.jsx';
+import { getEnvVariable } from '../../utils/env.jsx';
 
 function Open() {
     const [_, setLocation] = useLocation();
@@ -13,7 +13,7 @@ function Open() {
     const timer = useRef();
 
     async function checkDb() {
-        const result = await At.available(); // FIX: Changed 'db' to 'At'
+        const result = await At.available();
         if (result.success) {
             const frontGit = {
                 branch: getEnvVariable("FRONTEND_GIT_BRANCH") || "Unknown",
@@ -38,7 +38,6 @@ function Open() {
 
     useEffect(() => {
         checkDb();
-        // Clear timer on component unmount
         return () => clearTimeout(timer.current);
     }, []);
 
