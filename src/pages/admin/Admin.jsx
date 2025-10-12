@@ -1,102 +1,79 @@
-import './Admin.css'
-import { useEffect, useState } from 'react';
-import { useLocation } from 'wouter'
+// newsAppFront/src/pages/admin/Admin.jsx
+import './Admin.css';
+import { useLocation } from 'wouter';
 import { useDeviceResolution } from '../../contexts/DeviceResolution';
-import { db } from '../../api/db';
+import At from '../../api/db'; // Fixed: Default import (was { db })
 import { useSettingsContext } from '../../contexts/SettingsContext';
-import { useAuthContext } from '../../contexts/AuthContext'
-import { deleteCookie, AUTH_COOKIE_NAME } from '../../utils/cookies';
-
-import Settings from './components/Settings';
+import { useAuthContext } from '../../contexts/AuthContext';
 import Users from './components/Users';
+import Settings from './components/Settings';
 
-function AdminPage() {
-    const [_, navigate] = useLocation();
-    const { isDesktop } = useDeviceResolution();
-
-    const { setColorsTheme, settings } = useSettingsContext();
-    const { isUserRole } = useAuthContext();
+function Admin() {
+    const [location, setLocation] = useLocation();
+    const { deviceType } = useDeviceResolution();
+    const { setSettings } = useSettingsContext();
+    const { user, setUser } = useAuthContext();
     const [activeTab, setActiveTab] = useState('settings');
     const [users, setUsers] = useState([]);
-    const { user, setUser } = useAuthContext();
 
-    async function getAllUsers() {
-        const dbUsers = await db.getAllUsers();
-
-        setUsers(dbUsers.data);
+    async function loadUsers() {
+        const result = await At.getAllUsers();
+        if (result.success) {
+            setUsers(result.data);
+        }
     }
 
     useEffect(() => {
-        if (isUserRole('admin'))
-            getAllUsers();
-    }, [])
+        loadUsers();
+    }, []);
 
-    function gotoHomePage() {
-        navigate('/home');
-    }
-
-    function cancel() {
-        setColorsTheme(settings.colors_theme);
-        gotoHomePage();
-    }
-
-    function tabClick(tabId) {
-        setColorsTheme(settings.colors_theme);
-        setActiveTab(tabId);
-    }
-
-    if (!isDesktop) {
-        return (
-            <div className='not-available-msg'>
-                <div>
-                    This page is available only on wide screens.
-                </div>
-                <div>
-                    <button className='btn-back' onClick={gotoHomePage}>Home</button>
-                </div>
-            </div>
-        )
-    }
-
-    function logout() {
+    const handleLogout = () => {
         setUser(null);
-        deleteCookie(AUTH_COOKIE_NAME)
-        navigate('/login')
-    }
+        setLocation('/login');
+    };
+
+    const handleSettings = async (user) => {
+        const settingsResult = await At.getSettings(user);
+        if (settingsResult.success) {
+            setSettings(settingsResult.data);
+            setActiveTab('settings');
+        }
+    };
 
     return (
-        <div className='admin-container'>
-            <div className='tabs-area'>
-                <div className='header'>
-                    <div className='icon logout' onClick={ logout }>  
-                        <i className="fa fa-sign-out"></i>
-                    </div>
-
-                    <div className='icon close' onClick={cancel}>X</div>
+        <div className="admin-container">
+            <div className="header">
+                <div className="icon logout" onClick={handleLogout}>
+                    <i className="fa fa-sign-out"></i>
                 </div>
-
-                <div className='tabs'>
-                    <div className={`tab ${activeTab === 'settings' ? 'selected' : ''}`} onClick={() => tabClick('settings')}>Settings</div>
-                    {
-                        isUserRole('admin') &&
-                        <div className={`tab ${activeTab === 'users' ? 'selected' : ''}`} onClick={() => tabClick('users')} >Users</div>
-                    }
-                </div>
-
-                <div className='tab-area'>
-                    {
-                        (activeTab === 'settings') &&
-                        <Settings cancelFunc={cancel} user={ user } />
-                    }
-
-                    {
-                        (activeTab === 'users') &&
-                        <Users users={ users } setUsers={ setUsers } setActiveTab={setActiveTab} />
-                    }
+                <div className="icon close" onClick={() => setLocation('/home')}>
+                    X
                 </div>
             </div>
+            <div className="tabs">
+                <div
+                    className={`tab ${activeTab === 'settings' ? 'selected' : ''}`}
+                    onClick={() => setActiveTab('settings')}
+                >
+                    Settings
+                </div>
+                {user.role.toLowerCase() === 'admin' && (
+                    <div
+                        className={`tab ${activeTab === 'users' ? 'selected' : ''}`}
+                        onClick={() => setActiveTab('users')}
+                    >
+                        Users
+                    </div>
+                )}
+            </div>
+            <div className="tab-area">
+                {activeTab === 'settings' && <Settings cancelFunc={() => setLocation('/home')} user={user} />}
+                {activeTab === 'users' && (
+                    <Users users={users} setUsers={setUsers} setActiveTab={setActiveTab} />
+                )}
+            </div>
         </div>
-    )
+    );
 }
 
-export default AdminPage;
+export default Admin;
