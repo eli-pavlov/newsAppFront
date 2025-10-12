@@ -1,26 +1,24 @@
-import { createContext, useContext } from 'react';
+import { createContext, useState, useEffect, useContext } from "react";
 import { useMediaQuery } from 'react-responsive';
 
-const DeviceContext = createContext(null);
+export const DeviceResolution = createContext(null);
 
-export const DeviceResolutionProvider = ({ children }) => {
-    const isDesktop = useMediaQuery({ minWidth: 1025 });
-    const isTablet = useMediaQuery({ minWidth: 601, maxWidth: 1024 });
-    const isMobile = useMediaQuery({ maxWidth: 600 });
-    const deviceType = isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop';
+export function DeviceResolutionProvider({ children }) {
+    const isMobile = useMediaQuery({ maxWidth:600 });
+    const isTablet = useMediaQuery({ minWidth:601, maxWidth:1024});
+    const isDesktop = useMediaQuery({ minWidth:1025 });
 
-    const value = {
-        isDesktop,
-        isTablet,
-        isMobile,
-        deviceType
-    };
+    const [resolutions, setResolutions] = useState({isDesktop, isTablet, isMobile});
+
+    useEffect(() => {
+        setResolutions({isDesktop, isTablet, isMobile, deviceType:(isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop')});
+    }, [isDesktop, isTablet, isMobile]);
 
     return (
-        <DeviceContext.Provider value={value}>
+        <DeviceResolution.Provider value={resolutions} >
             {children}
-        </DeviceContext.Provider>
-    );
-};
+        </DeviceResolution.Provider>
+    )
+}
 
-export const useDeviceContext = () => useContext(DeviceContext);
+export const useDeviceResolution = () => useContext(DeviceResolution);
