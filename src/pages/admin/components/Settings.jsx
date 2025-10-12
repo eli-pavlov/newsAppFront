@@ -1,13 +1,13 @@
-// newsAppFront/src/pages/admin/components/Settings.jsx
+jsx// newsAppFront/src/pages/admin/components/Settings.jsx
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import At from '../../../api/db'; // Fixed: Default import (no braces; was { At })
+import At from '../../../api/db'; // Default import (no braces)
 import { SettingsContext } from '../../../contexts/SettingsContext';
-import Modal from '../../../components/Modal'; // Assuming Modal is the base modal
+import { Modal } from '../../../components/Modal'; // Named import if default not available
 import AddFooterMsgModal from '../modal/AddFooterMsgModal';
 import Section from './Section';
 import AdminCustomInput from './AdminCustomInput';
-import CustomButton from '../../../components/CustomButton'; // Corrected path
-import ConfirmModal from '../../../components/ConfirmModal'; // Corrected path
+import { CustomButton } from '../../../components/CustomButton'; // Fixed: Named import (braces) for non-default export
+import { ConfirmModal } from '../../../components/ConfirmModal'; //
 
 function Settings({ cancelFunc, user }) {
     const [addModalOpen, setAddModalOpen] = useState(false);
