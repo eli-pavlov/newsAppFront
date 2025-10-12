@@ -1,214 +1,168 @@
-import { useState, useEffect, useRef } from 'react';
+// newsAppFront/src/pages/admin/components/Users.jsx
 import '../Admin.css'
 import Section from './Section';
-import { db } from '../../../api/db';
+import At from '../../../api/db'; // Fixed: Default import (was { db })
 import ConfirmModal from '../../../components/ConfirmModal'
 import { useSettingsContext } from '../../../contexts/SettingsContext';
-import { getSettingsFromDB } from '../../../utils/settings';
 
 function Users({ users, setUsers, setActiveTab }) {
-    const newEmptyUser = {name:'', email:'', password:'', role:''};
-    
-    const [newUser, setNewUser] = useState(newEmptyUser);
-    const [msg, setMsg] = useState({});
-    const [openDeleteModal, setOpenDeleteModal] = useState(false);
-    const selectedUser = useRef(0);
     const { setSettings } = useSettingsContext();
- 
-    function clearNewUser() {
-        setNewUser(newEmptyUser);
-    }
+    const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'Editor' });
+    const [error, setError] = useState('');
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmData, setConfirmData] = useState({});
 
-    function clearMsg() {
-        displayMsg("", "")
-    }
+    const handleInputChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
+    };
 
-    function displayMsg(text, type="") {
-        setMsg({text:text, type:type})
-    }
-
-    async function addUser(e) {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-
-        const result = await db.addUser(newUser);
-
-        if (result.success) {
-            setUsers([...users, newUser]);
-            clearNewUser();
-            displayMsg("User added successfully.")
+        try {
+            const result = await At.addUser(formData);
+            if (result.success) {
+                setUsers([...users, { ...formData, id: Date.now() }]);
+                setFormData({ name: '', email: '', password: '', role: 'Editor' });
+                setError('');
+            } else {
+                setError(result.message);
+            }
+        } catch (err) {
+            setError(err.message);
         }
-        else {
-            displayMsg(result.message, "error")
+    };
+
+    const handleDelete = (user) => {
+        setConfirmData({
+            msg: `Delete user ${user.name}?`,
+            yesHandler: async () => {
+                try {
+                    const result = await At.deleteUser(user.email);
+                    if (result.success) {
+                        setUsers(users.filter(u => u.email !== user.email));
+                    } else {
+                        setError(result.message);
+                    }
+                } catch (err) {
+                    setError(err.message);
+                }
+                setConfirmOpen(false);
+            }
+        });
+        setConfirmOpen(true);
+    };
+
+    const handleSettings = async (user) => {
+        const settingsResult = await At.getSettings(user);
+        if (settingsResult.success) {
+            setSettings(settingsResult.data);
+            setActiveTab('settings');
+        } else {
+            setError(settingsResult.message);
         }
-    }
-
-    function updateNewUserData(e) {
-        clearMsg();
-        setNewUser({...newUser, [e.target.name]:e.target.value});
-    }
-
-    function deleteUser(user) {
-        selectedUser.current = user;
-        setOpenDeleteModal(true);
-    }
-
-    useEffect(() => {
-        clearNewUser();
-        clearMsg();
-    }, [])
-
-    useEffect(() => {
-        if (msg.text === '')
-            return;
-
-        const msgTimer = setTimeout(() => {
-            clearMsg();
-        }, 5000);
-
-        return () => clearTimeout(msgTimer);
-    }, [msg])
-
-    async function switchToUserSettings(e, user) {
-        e.preventDefault();
-
-        const result = await getSettingsFromDB(user);
-
-        if (result.success) {
-            setSettings(result.data);
-            setActiveTab("settings");
-        }
-    }
+    };
 
     return (
-        <>
-            {
-                openDeleteModal &&
-                <ConfirmModal
-                    titleData={{ text: `Delete user ${selectedUser.current.name}?`, style: { fontSize: "24px" } }}
-                    yesData={
-                        {
-                            text: "Yes",
-                            style: { "backgroundColor": "red", "border": "none", "padding": "16px", "fontWeight": "bold" },
-                            noHover: true,
-                            actionHandler: (async () => { 
-                                await db.deleteUser(selectedUser.current.email);
-                                const updatedUsers = users.filter(u => u.email != selectedUser.current.email);
-                                setUsers(updatedUsers);
-                             })
-                        }
-                    }
-                    noData={
-                        {
-                            text: "No",
-                            style: { "backgroundColor": "white", "color": "black", "padding": "16px", "border": "none" }
-                        }
-                    }
-                    closeHandler={() => { setOpenDeleteModal(false) }}
-                />
-            }
-
-            <div className='users-page'>
-                <Section title="Sign Up">
-                    <form className='add-user' onSubmit={addUser}>
-                        <div className='add-user-detailes'>
-                            <div>
-                                <input 
-                                    name="name"
-                                    value={newUser.name} 
-                                    className="element" 
-                                    type='text' 
-                                    placeholder='Name' 
-                                    onChange={ updateNewUserData }
-                                    required
-                                >
-                                </input>
-                            </div>
-                            <div>
-                                <input 
-                                    name="email"
-                                    value={newUser.email} 
-                                    className="element" 
-                                    type='email' 
-                                    placeholder='Email' 
-                                    onChange={ updateNewUserData }
-                                    required
-                                >
-                                </input>
-                            </div>
-                            <div>
-                                <input 
-                                    name="password"
-                                    value={newUser.password} 
-                                    className="element" 
-                                    type='text' 
-                                    placeholder='Password' 
-                                    onChange={ updateNewUserData }
-                                    required
-                                >
-                                </input>
-                            </div>
-                            <div>
-                                <select  
-                                    name="role"
-                                    value={newUser.role} 
-                                    className="element" 
-                                    onChange={ updateNewUserData }
-                                    required
-                                >
-                                    <option value='' disabled>Role</option>
-                                    <option value='Admin'>Admin</option>
-                                    <option value='Editor'>Editor</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button type="submit" className="element">Save</button>
-                    </form>
-                    <div className={`add-user-msg ${msg.type}`}>
-                        {msg.text}
+        <div className="users-page">
+            <Section title="Add User">
+                <form className="add-user" onSubmit={handleSubmit}>
+                    <div className="add-user-detailes">
+                        <input
+                            name="name"
+                            value={formData.name}
+                            className="element"
+                            type="text"
+                            placeholder="Name"
+                            onChange={handleInputChange}
+                            required
+                        />
+                        <input
+                            name="email"
+                            value={formData.email}
+                            className="element"
+                            type="email"
+                            placeholder="Email"
+                            onChange={handleInputChange}
+                            required
+                        />
+                        <input
+                            name="password"
+                            value={formData.password}
+                            className="element"
+                            type="text"
+                            placeholder="Password"
+                            onChange={handleInputChange}
+                            required
+                        />
+                        <select
+                            name="role"
+                            value={formData.role}
+                            className="element"
+                            onChange={handleInputChange}
+                            required
+                        >
+                            <option value="" disabled>Role</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Editor">Editor</option>
+                        </select>
                     </div>
-                </Section>
+                    <button type="submit" className="element">Save</button>
+                </form>
+                {error && <div className="add-user-msg error">{error}</div>}
+            </Section>
 
-                <Section title='Users List'>
-                    <div className='users-table'>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th width="30%">Name</th>
-                                    <th width="50%">Email</th>
-                                    <th width="10%">Role</th>
-                                    <th></th>
+            <Section title="Users List">
+                <div className="users-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="30%">Name</th>
+                                <th width="50%">Email</th>
+                                <th width="10%">Role</th>
+                                <th width="10%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {users.map((user, index) => (
+                                <tr key={index}>
+                                    <td>{user.name}</td>
+                                    <td>{user.email}</td>
+                                    <td>{user.role}</td>
+                                    <td>
+                                        <div className="actions">
+                                            <div className="font-icon" onClick={() => handleSettings(user)}>
+                                                <i className="fa fa-gear"></i>
+                                            </div>
+                                            <div className={`font-icon ${user.protected ? 'disabled' : ''}`} onClick={() => !user.protected && handleDelete(user)}>
+                                                <i className="fa fa-trash"></i>
+                                            </div>
+                                        </div>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                {
-                                    users.map((u, index) => (
-                                        <tr key={index}>
-                                            <td>{u.name}</td>
-                                            <td>{u.email}</td>
-                                            <td>{u.role}</td>
-                                            <td>
-                                                <div className='actions'>
-                                                    <div className='font-icon' onClick={(e) => { switchToUserSettings(e, u) }}>
-                                                        <i className="fa fa-gear"></i>
-                                                    </div>
-                                                    <div className={`font-icon ${u.protected ? 'disabled' : ''}`} onClick={() => { 
-                                                        if (!u.protected)
-                                                            deleteUser(u) 
-                                                    }}>
-                                                        <i className="fa fa-trash"></i>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </Section>
-            </div>
-        </>
-    )
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </Section>
+
+            {confirmOpen && (
+                <ConfirmModal
+                    titleData={{ text: confirmData.msg, style: { fontSize: '24px' } }}
+                    yesData={{
+                        text: 'Yes',
+                        style: { backgroundColor: 'red', border: 'none', padding: '16px', fontWeight: 'bold' },
+                        noHover: true,
+                        actionHandler: confirmData.yesHandler
+                    }}
+                    noData={{
+                        text: 'No',
+                        style: { backgroundColor: 'white', color: 'black', padding: '16px', border: 'none' }
+                    }}
+                    closeHandler={() => setConfirmOpen(false)}
+                />
+            )}
+        </div>
+    );
 }
 
 export default Users;
