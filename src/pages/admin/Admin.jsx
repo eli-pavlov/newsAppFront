@@ -4,7 +4,7 @@ import { useLocation } from 'wouter';
 import { useDeviceResolution } from '../../contexts/DeviceResolution';
 import At from '../../api/db'; // Fixed: Default import (was { db })
 import { useSettingsContext } from '../../contexts/SettingsContext';
-import { useAuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import Users from './components/Users';
 import Settings from './components/Settings';
 
@@ -12,7 +12,7 @@ function Admin() {
     const [location, setLocation] = useLocation();
     const { deviceType } = useDeviceResolution();
     const { setSettings } = useSettingsContext();
-    const { user, setUser } = useAuthContext();
+    const { user, setUser } = useAuth();
     const [activeTab, setActiveTab] = useState('settings');
     const [users, setUsers] = useState([]);
 

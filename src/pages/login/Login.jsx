@@ -1,7 +1,7 @@
 // newsAppFront/src/pages/login/Login.jsx
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
-import { useAuthContext } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { useSettingsContext } from '../../contexts/SettingsContext';
 import At from '../../api/db'; // Fixed: Changed to default import (was { db })
 import { createCookie, AUTH_COOKIE_NAME } from '../../utils/cookies';
@@ -9,7 +9,7 @@ import { getSettingsFromDB } from '../../utils/settings';
 
 function Login() {
     const [location, navigate] = useLocation();
-    const { setUser } = useAuthContext();
+    const { setUser } = useAuth();
     const { setSettings } = useSettingsContext();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');

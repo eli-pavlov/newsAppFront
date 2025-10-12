@@ -2,14 +2,14 @@ import '../Home.css'
 import { useDeviceResolution } from '../../../contexts/DeviceResolution';
 import { useSettingsContext } from '../../../contexts/SettingsContext';
 import { useLocation } from 'wouter'
-import { useAuthContext } from '../../../contexts/AuthContext'
+import { useAuth } from '../../../contexts/AuthContext'
 import { deleteCookie, AUTH_COOKIE_NAME } from '../../../utils/cookies';
 
 function Header() {
     const {settings } = useSettingsContext();
     const { deviceType } = useDeviceResolution();
     const [_, navigate ] = useLocation();
-    const { setUser } = useAuthContext();
+    const { setUser } = useAuth();
     
     function logout() {
         setUser(null);
