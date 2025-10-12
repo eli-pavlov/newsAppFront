@@ -1,78 +1,74 @@
-import './App.css'
-import OpenPage from './pages/open/Open'
-import HomePage from './pages/home/Home'
-import LoginPage from './pages/login/Login'
-import AdminPage from './pages/admin/Admin'
-import { DeviceResolutionProvider } from './contexts/DeviceResolution'
-import { Route } from 'wouter'
-import { SettingsContextProvider } from './contexts/SettingsContext'
-import { AuthContextProvider, useAuthContext } from './contexts/AuthContext'
+// newsAppFront/src/App.jsx
 import { useLocation } from 'wouter'
 import { useEffect, useRef } from 'react'
-import { db } from './api/db'
+import At from './api/db'; // Fixed: Default import (was { db })
 import { getSettingsFromDB } from './utils/settings'
 import { useSettingsContext } from './contexts/SettingsContext'
-
-function ProtectedRoute({ Component }) {
-  const [_, navigate] = useLocation();
-
-  const { user, setUser } = useAuthContext();
-  const { setSettings } = useSettingsContext();
-
-  async function initUserFromToken() {
-    const result = await db.verify();
-
-    if (result.success) {
-      const dbSettings = await getSettingsFromDB();
-      
-      setSettings(dbSettings.data);
-      setUser(result.user);
-      navigate('/admin');
-    }
-    else {
-      navigate('/login');
-    }
-  }
-
-  useEffect(() => {
-    if (!user) {
-      initUserFromToken();
-    }
-  }, [])
-
-  return user ? <Component /> : null;
-}
+import { useAuthContext } from './contexts/AuthContext'
+import { useDeviceResolution } from './contexts/DeviceResolution'
+import DeviceResolution from './contexts/DeviceResolution'
+import AuthProvider from './contexts/AuthContext'
+import SettingsProvider from './contexts/SettingsContext'
+import Open from './pages/open/Open'
+import Login from './pages/login/Login'
+import Home from './pages/home/Home'
+import Admin from './pages/admin/Admin'
+import './App.css'
 
 function App() {
-  let getVariables = useRef(true);
+    const [location] = useLocation();
+    const { setSettings } = useSettingsContext();
+    const { user } = useAuthContext();
+    const { deviceType } = useDeviceResolution();
+    const isLoadingRef = useRef(true);
 
-  async function getEnvVariablesFromServer() {
-    if (!getVariables)
-      return;
+    useEffect(() => {
+        const loadSettings = async () => {
+            const result = await getSettingsFromDB(user);
+            if (result.success) {
+                setSettings(result.data);
+            }
+            isLoadingRef.current = false;
+        };
 
-    getVariables = false;
+        loadSettings();
+    }, [user, setSettings]);
 
-    await db.getEnvVariables();
-  }
+    const isAdminRoute = location === '/admin';
+    const isLoginRoute = location === '/login';
+    const isOpenRoute = location === '/';
 
-  useEffect(() => {
-    getEnvVariablesFromServer();
-  }, [])
+    if (isLoadingRef.current) {
+        return <div>Loading...</div>;
+    }
 
-  return (
-    <>
-      <AuthContextProvider>
-        <SettingsContextProvider>
-          <DeviceResolutionProvider>
-            <Route path="/" component={OpenPage} />
-            <Route path="/login" component={LoginPage} />
-            <Route path="/home" component={() => <ProtectedRoute Component={HomePage} />} />
-            <Route path="/admin" component={() => <ProtectedRoute Component={AdminPage} />} />
-          </DeviceResolutionProvider>
-        </SettingsContextProvider>
-      </AuthContextProvider>
-    </>
-  )
+    if (isAdminRoute && !user) {
+        return <Login />;
+    }
+
+    if (isLoginRoute && user) {
+        return <Home />;
+    }
+
+    if (isOpenRoute && user) {
+        return <Home />;
+    }
+
+    return (
+        <div className={`App ${deviceType}`}>
+            {isOpenRoute ? <Open /> : (isAdminRoute ? <Admin /> : <Home />)}
+        </div>
+    );
 }
 
-export default App
+export default function AppWithProviders() {
+    return (
+        <DeviceResolution>
+            <AuthProvider>
+                <SettingsProvider>
+                    <App />
+                </SettingsProvider>
+            </AuthProvider>
+        </DeviceResolution>
+    );
+}
