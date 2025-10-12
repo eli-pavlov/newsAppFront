@@ -1,24 +1,49 @@
-import { createContext, useState, useEffect, useContext } from "react";
-import { useMediaQuery } from 'react-responsive';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-export const DeviceResolution = createContext(null);
+/**
+ * We initialize with null, and the hook will throw a helpful error if
+ * it's used outside the provider. If you'd prefer a silent fallback,
+ * replace `createContext(null)` with a default object.
+ */
+const DeviceResolutionContext = createContext(null);
 
 export function DeviceResolutionProvider({ children }) {
-    const isMobile = useMediaQuery({ maxWidth:600 });
-    const isTablet = useMediaQuery({ minWidth:601, maxWidth:1024});
-    const isDesktop = useMediaQuery({ minWidth:1025 });
+  const [deviceType, setDeviceType] = useState('desktop');
 
-    const [resolutions, setResolutions] = useState({isDesktop, isTablet, isMobile});
+  useEffect(() => {
+    // Guard for SSR / non-window environments
+    if (typeof window === 'undefined') return;
 
-    useEffect(() => {
-        setResolutions({isDesktop, isTablet, isMobile, deviceType:(isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop')});
-    }, [isDesktop, isTablet, isMobile]);
+    const classify = () => {
+      const width = window.innerWidth;
+      const next =
+        width < 768 ? 'mobile' :
+        width < 1024 ? 'tablet' :
+        'desktop';
+      setDeviceType(next);
+    };
 
-    return (
-        <DeviceResolution.Provider value={resolutions} >
-            {children}
-        </DeviceResolution.Provider>
-    )
+    classify();
+    window.addEventListener('resize', classify);
+    return () => window.removeEventListener('resize', classify);
+  }, []);
+
+  const value = useMemo(() => ({ deviceType, setDeviceType }), [deviceType]);
+
+  return (
+    <DeviceResolutionContext.Provider value={value}>
+      {children}
+    </DeviceResolutionContext.Provider>
+  );
 }
 
-export const useDeviceResolution = () => useContext(DeviceResolution);
+/**
+ * Safer hook: gives a clear, actionable error if provider is missing.
+ */
+export function useDeviceResolution() {
+  const ctx = useContext(DeviceResolutionContext);
+  if (!ctx) {
+    throw new Error('useDeviceResolution must be used within <DeviceResolutionProvider>');
+  }
+  return ctx;
+}
