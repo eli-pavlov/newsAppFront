@@ -6,8 +6,8 @@ import { Modal } from '../../../components/Modal'; // Named import if default no
 import AddFooterMsgModal from '../modal/AddFooterMsgModal';
 import Section from './Section';
 import AdminCustomInput from './AdminCustomInput';
-import { CustomButton } from '../../../components/CustomButton'; // Fixed: Named import (braces) for non-default export
-import { ConfirmModal } from '../../../components/ConfirmModal'; //
+import { CustomButton } from '../../../components/CustomButton'; // Named import (braces) for non-default export
+import ConfirmModal from '../../../components/ConfirmModal';
 
 function Settings({ cancelFunc, user }) {
     const [addModalOpen, setAddModalOpen] = useState(false);
