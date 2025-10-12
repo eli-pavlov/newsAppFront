@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 /**
- * We initialize with null, and the hook will throw a helpful error if
- * it's used outside the provider. If you'd prefer a silent fallback,
- * replace `createContext(null)` with a default object.
+ * Context holds responsive info for the app (deviceType).
+ * We start with null to detect incorrect usage (outside provider).
  */
 const DeviceResolutionContext = createContext(null);
 
@@ -11,7 +10,6 @@ export function DeviceResolutionProvider({ children }) {
   const [deviceType, setDeviceType] = useState('desktop');
 
   useEffect(() => {
-    // Guard for SSR / non-window environments
     if (typeof window === 'undefined') return;
 
     const classify = () => {
@@ -38,12 +36,20 @@ export function DeviceResolutionProvider({ children }) {
 }
 
 /**
- * Safer hook: gives a clear, actionable error if provider is missing.
+ * Named export expected by App.jsx:
+ * Allows usage like: <DeviceResolution>...</DeviceResolution>
+ */
+export function DeviceResolution({ children }) {
+  return <DeviceResolutionProvider>{children}</DeviceResolutionProvider>;
+}
+
+/**
+ * Hook to consume the context safely.
  */
 export function useDeviceResolution() {
   const ctx = useContext(DeviceResolutionContext);
   if (!ctx) {
-    throw new Error('useDeviceResolution must be used within <DeviceResolutionProvider>');
+    throw new Error('useDeviceResolution must be used within <DeviceResolution> (DeviceResolutionProvider).');
   }
   return ctx;
 }
