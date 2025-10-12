@@ -1,12 +1,13 @@
-// frontend/src/pages/admin/components/Settings.jsx (added fetch error handling; progress via setInterval; ContentType in presign)
+// newsAppFront/src/pages/admin/components/Settings.jsx
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { At } from '../../../api/db.jsx'; // Assuming At is your API client
+import { At } from '../../../api/db.jsx'; // Your API client
 import { SettingsContext } from '../../../contexts/SettingsContext';
-import Modal from '../modal/AddFooterMsgModal'; // Assuming this exists
+import Modal from '../../../components/Modal'; // Assuming Modal is the base modal
+import AddFooterMsgModal from '../modal/AddFooterMsgModal';
 import Section from './Section';
 import AdminCustomInput from './AdminCustomInput';
-import CustomButton from '../CustomButton'; // Assuming this exists
-import ConfirmModal from '../ConfirmModal'; // Assuming this exists
+import CustomButton from '../../../components/CustomButton'; // Corrected path
+import ConfirmModal from '../../../components/ConfirmModal'; // Corrected path
 
 function Settings({ cancelFunc, user }) {
     const [addModalOpen, setAddModalOpen] = useState(false);
@@ -157,9 +158,139 @@ function Settings({ cancelFunc, user }) {
     };
 
     return (
-        // JSX as before, with upload button wired to handleUpload
-        // ... (rest of JSX unchanged, just add error display for uploadMessage)
-        <div className="upload-msg">{uploadMessage}</div>
+        <div className="admin-settings">
+            {/* Theme Selector */}
+            <Section title="Colors Theme">
+                <div className="colors-themes">
+                    <div className={`color-theme-btn dark ${theme === 'dark' ? 'selected' : ''}`}
+                         data-value="dark"
+                         onClick={(e) => {
+                             setColorsTheme(e.target.getAttribute('data-value'));
+                             setTheme(e.target.getAttribute('data-value'));
+                         }}>
+                    </div>
+                    <div className={`color-theme-btn light ${theme === 'light' ? 'selected' : ''}`}
+                         data-value="light"
+                         onClick={(e) => {
+                             setColorsTheme(e.target.getAttribute('data-value'));
+                             setTheme(e.target.getAttribute('data-value'));
+                         }}>
+                    </div>
+                </div>
+            </Section>
+
+            {/* Title Input */}
+            <Section title="Title">
+                <AdminCustomInput
+                    id="title"
+                    value={title}
+                    setValue={setTitle}
+                    disabled={true} // Editable only for admin
+                />
+            </Section>
+
+            {/* Footer Messages */}
+            <Section title="Footer Messages">
+                {/* Existing code for footer messages */}
+            </Section>
+
+            {/* Downloaded Movies */}
+            <Section title="Downloaded Movies">
+                {/* Existing code for movies table and upload */}
+                <div className="upload-wrapper">
+                    <input
+                        id="file-select"
+                        type="file"
+                        accept=".mp4"
+                        onChange={(e) => setUploadFile(e.target.files[0])}
+                        style={{ display: 'none' }}
+                    />
+                    <CustomButton
+                        text="Select file"
+                        onClick={() => document.getElementById('file-select').click()}
+                        disabled={isUploading}
+                    />
+                    {uploadFile && (
+                        <div className="progress-wrapper">
+                            <div className="upload-progress empty"></div>
+                            <div className="upload-progress full" style={{ width: `${uploadProgress}%` }}></div>
+                            <div className="upload-progress file-name">{uploadFile.name}</div>
+                        </div>
+                    )}
+                    <CustomButton
+                        text="Upload file"
+                        onClick={handleUpload}
+                        disabled={!uploadFile || isUploading}
+                    />
+                    <div className="upload-msg">{uploadMessage}</div>
+                </div>
+            </Section>
+
+            {/* Online Movies Categories */}
+            <Section title="Online Movies Categories">
+                <div className="movies-categories">
+                    {onlineCategories.map((cat, index) => (
+                        <div
+                            key={index}
+                            className={`movie-category ${cat.selected ? 'selected' : ''}`}
+                            onClick={() => toggleCategory(cat.name)}
+                        >
+                            {cat.name}
+                        </div>
+                    ))}
+                </div>
+            </Section>
+
+            {/* Save/Cancel Buttons */}
+            <div className="buttons">
+                <CustomButton
+                    text="Save Settings"
+                    onClick={handleSave}
+                    style={{ padding: '12px', fontSize: '24px' }}
+                />
+                <CustomButton
+                    text="Cancel"
+                    onClick={cancelFunc}
+                    style={{ padding: '12px', fontSize: '24px' }}
+                />
+            </div>
+
+            {/* Confirm Modal */}
+            {confirmModalOpen && (
+                <ConfirmModal
+                    titleData={{ text: confirmData.msg, style: { fontSize: '24px' } }}
+                    yesData={{
+                        text: 'Yes',
+                        style: { backgroundColor: 'red', border: 'none', padding: '16px', fontWeight: 'bold' },
+                        noHover: true,
+                        actionHandler: confirmData.yesHandler
+                    }}
+                    noData={{
+                        text: 'No',
+                        style: { backgroundColor: 'white', color: 'black', padding: '16px', border: 'none' }
+                    }}
+                    closeHandler={() => setConfirmModalOpen(false)}
+                />
+            )}
+
+            {/* Add Footer Msg Modal */}
+            {addModalOpen && (
+                <AddFooterMsgModal
+                    closeHandler={() => setAddModalOpen(false)}
+                    saveHandler={(msg) => {
+                        // Add logic
+                        setAddModalOpen(false);
+                    }}
+                />
+            )}
+
+            {/* Video Preview */}
+            {videoPreview && (
+                <video ref={videoRef} controls>
+                    <source src={videoPreview} type="video/mp4" />
+                </video>
+            )}
+        </div>
     );
 }
 
