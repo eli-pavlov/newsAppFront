@@ -1,4 +1,3 @@
-jsx// newsAppFront/src/pages/admin/components/Settings.jsx
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import At from '../../../api/db'; // Default import (no braces)
 import { SettingsContext } from '../../../contexts/SettingsContext';
