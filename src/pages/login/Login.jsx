@@ -1,129 +1,112 @@
-import { useState, useEffect } from 'react';
-import './Login.css'
-import { useLocation } from 'wouter'
+// newsAppFront/src/pages/login/Login.jsx
+import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 import { useAuthContext } from '../../contexts/AuthContext';
 import { useSettingsContext } from '../../contexts/SettingsContext';
-import { db } from '../../api/db';
+import At from '../../api/db'; // Fixed: Changed to default import (was { db })
 import { createCookie, AUTH_COOKIE_NAME } from '../../utils/cookies';
 import { getSettingsFromDB } from '../../utils/settings';
 
-export function LoginPage() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [errMsg, setErrMsg] = useState("");
-    const [protectedUsers, setProtectedUsers] = useState([]);
-    const [autoLoginUser, setAutoLoginUser] = useState('');
-
-    const [_, navigate] = useLocation();
-
+function Login() {
+    const [location, navigate] = useLocation();
     const { setUser } = useAuthContext();
-
     const { setSettings } = useSettingsContext();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
+    const [users, setUsers] = useState([]); // Assuming this is populated elsewhere or from props
+    const [selectedUser, setSelectedUser] = useState(null);
 
-    async function fillProtectedUsers() {
-        const result = await db.getProtectedUsers();
-
-        setProtectedUsers(result.data);
-    }
-
-    useEffect(() => {
-        fillProtectedUsers();
-    }, [])
-
-    async function initSettings() {
-        const dbSettings = await getSettingsFromDB();
-
-        setSettings(dbSettings.data);
-    }
-
-    async function login(e) {
+    const handleSubmit = async (e) => {
         e.preventDefault();
+        setError('');
 
-        let result = null;
-        if (autoLoginUser === '')
-            result = await db.login(email, password);
-        else
-            result = await db.login(autoLoginUser.email, autoLoginUser.password);
-        
-        if (!result.success)
-            setErrMsg(result.message);
-        else {
-            setUser(result.data);
+        try {
+            let result;
+            if (selectedUser) {
+                result = await At.login(selectedUser.email, selectedUser.password); // Fixed: Use At
+            } else {
+                result = await At.login(email, password); // Fixed: Use At
+            }
 
-            createCookie(AUTH_COOKIE_NAME, result.tokens.auth_token);
+            if (result.success) {
+                setUser(result.data);
+                createCookie(AUTH_COOKIE_NAME, result.tokens.auth_token);
+                
+                // Load settings
+                const settingsResult = await getSettingsFromDB(result.data);
+                if (settingsResult.success) {
+                    setSettings(settingsResult.data);
+                }
 
-            await initSettings();
-
-            navigate('/admin');
+                navigate('/admin');
+            } else {
+                setError(result.message || 'Login failed');
+            }
+        } catch (err) {
+            setError(err.message || 'Connection error');
         }
-    }
+    };
+
+    const handleUserSelect = (user) => {
+        setSelectedUser(user);
+        setEmail('');
+        setPassword('');
+    };
 
     return (
-        <div className='container'>
-            <form onSubmit={login} className='login'>
-                <div className='element'>
+        <div className="container">
+            <form onSubmit={handleSubmit} className="login">
+                <div className="element">
                     <label htmlFor="email">Email</label>
                     <input
                         type="email"
                         name="email"
-                        onChange={
-                            (e) => {
-                                setEmail(e.target.value);
-                                setErrMsg('');
-                                setAutoLoginUser('');
-                            }
-                        }
                         value={email}
-                        required={ !(!!autoLoginUser) }
+                        onChange={(e) => {
+                            setEmail(e.target.value);
+                            setError('');
+                            setSelectedUser(null);
+                        }}
+                        required={!selectedUser}
                     />
                 </div>
-                <div className='element'>
+                <div className="element">
                     <label htmlFor="password">Password</label>
                     <input
                         type="password"
                         name="password"
-                        onChange={
-                            (e) => {
-                                setPassword(e.target.value);
-                                setErrMsg('');
-                                setAutoLoginUser('');
-                            }
-                        }
                         value={password}
-                        required={ !(!!autoLoginUser) }
+                        onChange={(e) => {
+                            setPassword(e.target.value);
+                            setError('');
+                            setSelectedUser(null);
+                        }}
+                        required={!selectedUser}
                     />
                 </div>
-
-                <div className='element'>
+                <div className="element">
                     <label htmlFor="users">Select user</label>
                     <select
-                        value = { autoLoginUser?.name ?? '' }
-                        onChange = { (e) => { 
-                            setEmail('');
-                            setPassword('');
-
-                            const autoUser = protectedUsers.find(u => u.name === e.target.value);
-                            
-                            setAutoLoginUser(autoUser);
+                        value={selectedUser ? selectedUser.name : ''}
+                        onChange={(e) => {
+                            const user = users.find(u => u.name === e.target.value);
+                            handleUserSelect(user);
                         }}
                     >
-                        <option key='empty' value=''></option>
-                        {
-                            protectedUsers.map((u, index) => (
-                                <option key={index} value={u.name}>{u.name}</option>
-                            ))
-                        }
+                        <option value="">Empty</option>
+                        {users.map((user, index) => (
+                            <option key={index} value={user.name}>
+                                {user.name}
+                            </option>
+                        ))}
                     </select>
                 </div>
-
                 <button type="submit">Login</button>
-                <div className='errorMsg'>
-                    {errMsg}
-                </div>
-
+                <div className="errorMsg">{error}</div>
             </form>
         </div>
-    )
+    );
 }
 
-export default LoginPage
+export default Login;
