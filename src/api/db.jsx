@@ -124,6 +124,18 @@ class Wp {
     async finalizeDelete(fileName, subFolder) {
         return await this.createFetch('/files/finalize_delete', 'POST', { fileName, subFolder }, true);
     }
+
+    async verify() {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const result = await this.createFetch("/auth/verify", "get", null, true);
+                resolve(result);
+            } catch (e) {
+                reject({ success: false, message: e.message });
+            }
+        });
+    }
+
 }
 
 export default new Wp();

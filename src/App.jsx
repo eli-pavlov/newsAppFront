@@ -1,73 +1,66 @@
-// newsAppFront/src/App.jsx
-import { useLocation } from 'wouter'
-import { useEffect, useRef } from 'react'
-import At from './api/db'
-import { getSettingsFromDB } from './utils/settings'
-import { useSettingsContext } from './contexts/SettingsContext'
-import { useAuthContext } from './contexts/AuthContext'
-import { DeviceResolution, useDeviceResolution } from './contexts/DeviceResolution'
-import { AuthContextProvider as AuthProvider } from './contexts/AuthContext'
-import { SettingsContextProvider as SettingsProvider } from './contexts/SettingsContext'
-import Open from './pages/open/Open'
-import Login from './pages/login/Login'
-import Home from './pages/home/Home'
-import Admin from './pages/admin/Admin'
-import './App.css'
+import React, { useEffect, useState } from 'react';
+import { Switch, Route, useLocation } from "wouter";
+import { useAuth } from './contexts/AuthContext';
+import { useSettings } from './contexts/SettingsContext';
+import { initSettings } from './utils/settings';
+import api from './api/db';
+
+import Home from './pages/home/Home';
+import Admin from './pages/admin/Admin';
+import Login from './pages/login/Login';
+import Open from './pages/open/Open';
+import Loader from './components/Loader';
+
+import './App.css';
 
 function App() {
-    const [location] = useLocation();
-    const { setSettings } = useSettingsContext();
-    const { user } = useAuthContext();
-    const { deviceType } = useDeviceResolution();
-    const isLoadingRef = useRef(true);
+    const { user, setUser } = useAuth();
+    const { setSettings } = useSettings();
+    const [location, setLocation] = useLocation();
+    const [loading, setLoading] = useState(true); // Add a loading state
 
     useEffect(() => {
-        const loadSettings = async () => {
-            const result = await getSettingsFromDB(user);
-            if (result.success) {
-                setSettings(result.data);
+        const checkAuthAndLoadSettings = async () => {
+            const authResult = await api.verify();
+
+            if (authResult.success) {
+                // User is authenticated
+                setUser(authResult.user);
+                const settingsResult = await initSettings();
+                setSettings(settingsResult);
+
+                // If user is on login page, redirect to admin
+                if (location === '/login') {
+                    setLocation('/admin');
+                }
+            } else {
+                // User is not authenticated, redirect to login
+                // unless they are on the opening page.
+                if (location !== '/') {
+                    setLocation('/login');
+                }
             }
-            isLoadingRef.current = false;
+            setLoading(false); // Stop loading
         };
 
-        loadSettings();
-    }, [user, setSettings]);
+        checkAuthAndLoadSettings();
+    }, []); // This empty dependency array ensures it runs only once on mount
 
-    const isAdminRoute = location === '/admin';
-    const isLoginRoute = location === '/login';
-    const isOpenRoute = location === '/';
-
-    if (isLoadingRef.current) {
-        return <div>Loading...</div>;
-    }
-
-    if (isAdminRoute && !user) {
-        return <Login />;
-    }
-
-    if (isLoginRoute && user) {
-        return <Home />;
-    }
-
-    if (isOpenRoute && user) {
-        return <Home />;
+    // Show a loading screen while we check for an active session
+    if (loading && location !== '/') {
+        return <Loader fullScreen={true} />;
     }
 
     return (
-        <div className={`App ${deviceType}`}>
-            {isOpenRoute ? <Open /> : (isAdminRoute ? <Admin /> : <Home />)}
-        </div>
+        <Switch>
+            <Route path="/" component={Open} />
+            <Route path="/login" component={Login} />
+            <Route path="/home">{user ? <Home /> : <Login />}</Route>
+            <Route path="/admin">{user ? <Admin /> : <Login />}</Route>
+            {/* Add a default fallback route if needed */}
+            <Route>404: Not Found!</Route>
+        </Switch>
     );
 }
 
-export default function AppWithProviders() {
-    return (
-        <DeviceResolution>
-            <AuthProvider>
-                <SettingsProvider>
-                    <App />
-                </SettingsProvider>
-            </AuthProvider>
-        </DeviceResolution>
-    );
-}
+export default App;
