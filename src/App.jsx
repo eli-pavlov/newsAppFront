@@ -7,7 +7,7 @@ import { useSettingsContext } from './contexts/SettingsContext'
 import { useAuthContext } from './contexts/AuthContext'
 import { DeviceResolution, useDeviceResolution } from './contexts/DeviceResolution'
 import { AuthProvider } from './contexts/AuthContext';
-import SettingsProvider from './contexts/SettingsContext'
+import { SettingsProvider } from './contexts/SettingsContext';
 import Open from './pages/open/Open'
 import Login from './pages/login/Login'
 import Home from './pages/home/Home'
