@@ -1,7 +1,7 @@
 // newsAppFront/src/App.jsx
 import { useLocation } from 'wouter'
 import { useEffect, useRef } from 'react'
-import At from './api/db'; // Fixed: Default import (was { db })
+import At from './api/db'
 import { getSettingsFromDB } from './utils/settings'
 import { useSettingsContext } from './contexts/SettingsContext'
 import { useAuthContext } from './contexts/AuthContext'
