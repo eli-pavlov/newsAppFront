@@ -1,6 +1,6 @@
 // newsAppFront/src/pages/admin/components/Settings.jsx
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { At } from '../../../api/db.jsx'; // Your API client
+import At from '../../../api/db'; // Fixed: Default import (no braces; was { At })
 import { SettingsContext } from '../../../contexts/SettingsContext';
 import Modal from '../../../components/Modal'; // Assuming Modal is the base modal
 import AddFooterMsgModal from '../modal/AddFooterMsgModal';
