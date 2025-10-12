@@ -50,10 +50,6 @@ class Wp {
         return await this.createFetch('/db/available', 'GET');
     }
 
-    async verify() {
-        return await this.createFetch('/auth/verify', 'GET', null, true);
-    }
-
     async login(email, password) {
         return await this.createFetch('/auth/login', 'POST', { email, password });
     }

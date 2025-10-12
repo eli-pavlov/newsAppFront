@@ -1,18 +1,25 @@
-import { useContext, useState, createContext } from "react";
+// src/contexts/AuthContext.jsx
 
-export const AuthContext = createContext(null);
+import React, { createContext, useContext, useState } from 'react';
 
-export function AuthContextProvider({ children }) {
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
 
-    function isUserRole(role) {
-        if (!user)
+    const isUserRole = (role) => {
+        if (!user || !user.role) {
             return false;
-
+        }
         return user.role.toLowerCase() === role.toLowerCase();
-    }
+    };
 
-    return <AuthContext.Provider value={{ user, setUser, isUserRole }}>{children}</AuthContext.Provider>;
+    const value = { user, setUser, isUserRole };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuthContext = () => useContext(AuthContext);
+// This is the missing piece that fixes the error
+export const useAuth = () => {
+    return useContext(AuthContext);
+};
