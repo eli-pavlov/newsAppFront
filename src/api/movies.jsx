@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getEnvVariable } from '../utils/env';
+import getEnvVariable from '../utils/env';
 import { getCookie } from '../utils/cookies';
 
 const serverUrl = getEnvVariable("SERVER_URL") || window.location.origin;
