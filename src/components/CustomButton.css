@@ -1,0 +1,33 @@
+.custom-button-wrapper {
+    padding: 8px;
+}
+
+.custom-button-wrapper button {
+    width: 100%;
+    font-size: 16px;
+    color: white;
+    background-color: black;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 8px;
+}
+
+.custom-button-wrapper button.disabled {
+    cursor: default;
+    opacity: 0.2;
+}
+
+.custom-button-wrapper:not(.no-hover) button:hover {
+    background-color: gray;
+    color: black;
+}
+
+.custom-button-wrapper.icon {
+    display: flex;
+    align-items: center;    
+}
+
+.error-msg {
+    color: red;
+    text-align: center;
+}
