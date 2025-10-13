@@ -11,7 +11,7 @@ import Input from './AdminCustomInput';
 
 // Contexts & Utils
 import { useSettings } from '../../../contexts/SettingsContext';
-import getEnvVariable from '../../../utils/env';
+import { getEnvVariable } from '../../../utils/env';
 import { useUser } from '../../../contexts/AuthContext';
 import { getSettings } from '../../../utils/settings'; // Assuming this fetches settings
 
