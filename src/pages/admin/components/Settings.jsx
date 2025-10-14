@@ -7,11 +7,11 @@ import At from '../../../api/db.jsx';
 import { uploadMovie, deleteMovie } from '../../../api/movies.jsx';
 import { getDefaultSettings } from '../../../utils/settings.jsx';
 import { getEnvVar } from '../../../utils/env.jsx';
-import CustomButton from '../../CustomButton.jsx';
-import CustomInput from '../../CustomInput.jsx';
+import CustomButton from '../../../components/CustomButton.jsx';
+import CustomInput from '../../../components/CustomInput.jsx';
 import Section from './Section.jsx';
 import AddFooterMsgModal from '../modal/AddFooterMsgModal.jsx';
-import ConfirmModal from '../../ConfirmModal.jsx';
+import ConfirmModal from '../../../components/ConfirmModal.jsx';
 import './AdminCustomInput.jsx';
 import './Settings.css';
 
@@ -32,6 +32,7 @@ function Settings({ cancelFunc, user }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const { setColorsTheme, settings, setSettings } = useContext(SettingsContext);
   const [confirmModal, setConfirmModal] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -99,8 +100,8 @@ function Settings({ cancelFunc, user }) {
     }
   }
 
-  function preview(index) {
-    setPreviewMovie(movies[index].url);
+  function preview(url) {
+    setPreviewMovie(url);
     const video = videoRef.current;
     if (!video) return;
     video.load();
@@ -111,7 +112,8 @@ function Settings({ cancelFunc, user }) {
   }
 
   function selectFile() {
-    document.getElementById('file-select').click();
+    setUploadMsg("");
+    document.querySelector("#file-select").click();
   }
 
   function onFileChange(e) {
@@ -120,11 +122,11 @@ function Settings({ cancelFunc, user }) {
       setSelectedFile(null);
     } else {
       const file = e.target.files[0];
-      if (file.name.endsWith('mp4')) {
+      if (file.name.endsWith("mp4")) {
         setSelectedFile(file);
       } else {
         setSelectedFile(null);
-        setUploadMsg('Invalid file format.');
+        setUploadMsg("Invalid file format.");
       }
     }
   }
@@ -150,6 +152,14 @@ function Settings({ cancelFunc, user }) {
     }
   }
 
+  function Pn(index, fileName, subFolder) {
+    setConfirmModal({
+      msg: 'Delete this movie?',
+      yesHandler: () => deleteMovieHandler(index, fileName, subFolder)
+    });
+    setShowConfirm(true);
+  }
+
   async function deleteMovieHandler(index, fileName, subFolder) {
     const res = await deleteMovie(fileName, subFolder);
     if (res.success) {
@@ -165,11 +175,26 @@ function Settings({ cancelFunc, user }) {
     setOnlineMoviesCategories(categories);
   }
 
-  function isChanged() {
-    return title !== settings.title || JSON.stringify(footerMessages) !== JSON.stringify(settings.footer_messages) || JSON.stringify(movies) !== JSON.stringify(settings.movies) || JSON.stringify(onlineMoviesCategories) !== JSON.stringify(settings.online_movies_categories) || colorsTheme !== settings.colors_theme;
+  function Rt() {
+    // Assuming this is the Ctrl+Shift check function
+    return keys.includes('Control') && keys.includes('Shift');
   }
 
-  const isCtrlShift = () => Rt(); // Assuming Rt is defined elsewhere for Ctrl+Shift
+  const [keys, setKeys] = useState([]);
+
+  useEffect(() => {
+    const down = (e) => {
+      if (keys.includes(e.key)) return;
+      setKeys([...keys, e.key]);
+    };
+    const up = () => setKeys([]);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, [keys]);
 
   return (
     <div className="settings-page">
@@ -181,7 +206,7 @@ function Settings({ cancelFunc, user }) {
           </div>
         </Section>
         <Section title="Title">
-          <CustomInput id="title" value={title} setValue={setTitle} disabled={isEditable} disableInput={openTitleEdit} />
+          <AdminCustomInput id="title" value={title} setValue={setTitle} disabled={isEditable} disableInput={openTitleEdit} />
         </Section>
         <Section title="Footer Messages">
           <div className="add-footer-msg" onClick={() => setIsAddFooterMsg(true)}><i className="fa fa-plus"></i></div>
@@ -196,7 +221,7 @@ function Settings({ cancelFunc, user }) {
             <tbody>
               {footerMessages.map((msg, index) => (
                 <tr key={msg.id}>
-                  <td><CustomInput id={`footer-msg-${msg.id}`} value={msg.msg} setValue={(val) => updateFooterMsg(index, 'msg', val)} disabled={msg.disabled} disableInput={() => updateFooterMsg(index, 'edit')} /></td>
+                  <td><AdminCustomInput id={`footer-msg-${msg.id}`} value={msg.msg} setValue={(val) => updateFooterMsg(index, 'msg', val)} disabled={msg.disabled} disableInput={() => updateFooterMsg(index, 'edit')} /></td>
                   <td><div className="active"><input type="checkbox" checked={msg.active} onChange={() => updateFooterMsg(index, 'active')} /></div></td>
                   <td>
                     <div className="actions">
@@ -222,7 +247,7 @@ function Settings({ cancelFunc, user }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {movies.map((movie, index) => (
+                  {movies && movies.map((movie, index) => (
                     <tr key={`${movie.file_name}-${index}`}>
                       <td>{movie.file_name}</td>
                       <td>
@@ -243,7 +268,7 @@ function Settings({ cancelFunc, user }) {
                       }} /></div></td>
                       <td>
                         <div className="actions">
-                          <div className="font-icon" onClick={() => preview(index)}><i className="fa fa-eye"></i></div>
+                          <div className="font-icon" onClick={() => preview(movie.url)}><i className="fa fa-eye"></i></div>
                           <div className={`font-icon ${movie.deletable ? '' : 'disabled'}`} onClick={movie.deletable ? () => Pn(index, movie.file_name, movie.subFolder) : null}><i className="fa fa-trash"></i></div>
                         </div>
                       </td>
@@ -267,7 +292,7 @@ function Settings({ cancelFunc, user }) {
               <div className="upload-progress full" style={{ width: `${uploadProgress}%` }} />
               <div className="upload-progress file-name">{selectedFile?.name ?? ""}</div>
             </div>
-            <CustomButton name="upload" text="Upload file" type="button" onClick={selectedFile && !isUploading ? upload : null} style={{ fontSize: "24px" }} noHover={!selectedFile || isUploading} disabled={!selectedFile || isUploading} />
+            <CustomButton name="upload" text="Upload file" type="button" onClick={selectedFile && !isUploading ? uploadFile : null} style={{ fontSize: "24px" }} noHover={!selectedFile || isUploading} disabled={!selectedFile || isUploading} />
             <div className="upload-msg">{uploadMsg}</div>
           </div>
         </Section>
@@ -281,12 +306,12 @@ function Settings({ cancelFunc, user }) {
           </div>
         </Section>
         <div className="buttons">
-          <CustomButton name="save" text="Save Settings" type="button" noHover={!isEditable && !isCtrlShift()} disabled={!isEditable && !isCtrlShift()} onClick={isEditable || isCtrlShift() ? save : null} style={{ padding: "12px", fontSize: "24px" }} />
-          <CustomButton name="cancel" text="Cancel" type="button" onClick={cancel} style={{ padding: "12px", fontSize: "24px" }} />
+          <CustomButton name="save" text="Save Settings" type="button" noHover={!isEditable && !Rt()} disabled={!isEditable && !Rt()} onClick={isEditable || Rt() ? save : null} style={{ padding: "12px", fontSize: "24px" }} />
+          <CustomButton name="cancel" text="Cancel" type="button" onClick={cancelFunc} style={{ padding: "12px", fontSize: "24px" }} />
         </div>
       </form>
       {isAddFooterMsg && <AddFooterMsgModal closeHandler={closeAddFooterMsg} saveHandler={addFooterMsg} />}
-      {showConfirm && <ConfirmModal titleData={{ text: confirmModal.msg, style: { fontSize: "24px" } }} yesData={{ text: "Yes", style: { backgroundColor: "red", border: "none", padding: "16px", fontWeight: "bold" }, noHover: true, actionHandler: confirmModal.yesHandler }} noData={{ text: "No", style: { backgroundColor: "white", color: "black", padding: "16px", border: "none" } }} closeHandler={() => setShowConfirm(false)} />}
+      {showConfirm && <ConfirmModal titleData={{ text: confirmModal.msg, style: { fontSize: "24px" } }} yesData={{ text: "Yes", style: { backgroundColor: "red", border: "none", padding: "16px", fontWeight: "bold" }, noHover: true, actionHandler: confirmModal.yesHandler }} noData={{ text: "No", style: { backgroundColor: "white", color: "black", padding: "16px", border: "none" } }} closeHandler={() => setShowConfirm(false) } />}
     </div>
   );
 }
