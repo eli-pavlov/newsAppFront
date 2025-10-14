@@ -1,86 +1,38 @@
+// src/api/movies.jsx
+import At from './db.jsx'; // assuming this is the import for the API wrapper
 import axios from 'axios';
-import { getEnvVariable } from '../utils/env';
-import { getCookie } from '../utils/cookies';
 
-const serverUrl = getEnvVariable("SERVER_URL") || window.location.origin;
-const AUTH_USER = 'authuser';
+export async function uploadMovie(file, subFolder, onProgress) {
+  const presignRes = await At.createFetch('/files/presign', 'post', {fileName: file.name, subFolder, contentType: file.type}, true);
+  if (!presignRes.success) return presignRes;
 
-// Create an axios instance for API calls that require authentication
-const authApi = axios.create({
-    baseURL: serverUrl,
-});
+  const url = presignRes.data.data.url; // assuming structure {success: true, data: {url: presignedUrl}}
 
-// Add a request interceptor to automatically attach the auth token
-authApi.interceptors.request.use(config => {
-    const token = getCookie(AUTH_USER);
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    if (!config.headers['Content-Type']) {
-        config.headers['Content-Type'] = 'application/json';
-    }
-    return config;
-}, error => {
-    return Promise.reject(error);
-});
+  const putConfig = {
+    headers: {'Content-Type': file.type},
+    onUploadProgress
+  };
 
-/**
- * Requests a presigned URL for uploading a file.
- * @param {string} fileName - The name of the file.
- * @param {string} fileType - The MIME type of the file.
- * @param {string|null} subFolder - The subfolder for the upload (e.g., user ID).
- * @returns {Promise<object>} The API response.
- */
-export const getPresignedUrl = async (fileName, fileType, subFolder = null) => {
-    try {
-        const response = await authApi.post("/files/presign", { fileName, contentType: fileType, subFolder });
-        return response.data;
-    } catch (e) {
-        return { success: false, message: e.message };
-    }
-};
+  const putRes = await axios.put(url, file, putConfig);
 
-/**
- * Notifies the backend that the upload to S3 is complete.
- * @param {string} fileName - The name of the file.
- * @param {string|null} subFolder - The subfolder where the file was uploaded.
- * @returns {Promise<object>} The API response.
- */
-export const finalizeUpload = async (fileName, subFolder = null) => {
-    try {
-        const response = await authApi.post("/files/finalize", { fileName, subFolder });
-        return response.data;
-    } catch (e) {
-        return { success: false, message: e.message };
-    }
-};
+  if (putRes.status !== 200) return {success: false, message: 'Upload to S3 failed'};
 
-/**
- * Requests a presigned URL for deleting a file.
- * @param {string} fileName - The name of the file to delete.
- * @param {string} subFolder - The subfolder where the file is located.
- * @returns {Promise<object>} The API response.
- */
-export const getPresignedDeleteUrl = async (fileName, subFolder) => {
-    try {
-        const response = await authApi.post("/files/delete-presign", { fileName, subFolder });
-        return response.data;
-    } catch (e) {
-        return { success: false, message: e.message };
-    }
-};
+  const finalizeRes = await At.createFetch('/files/finalize', 'post', {fileName: file.name, subFolder}, true);
 
-/**
- * Notifies the backend that the file deletion from S3 is complete.
- * @param {string} fileName - The name of the deleted file.
- * @param {string} subFolder - The subfolder from which the file was deleted.
- * @returns {Promise<object>} The API response.
- */
-export const finalizeDelete = async (fileName, subFolder) => {
-    try {
-        const response = await authApi.post("/files/finalize-delete", { fileName, subFolder });
-        return response.data;
-    } catch (e) {
-        return { success: false, message: e.message };
-    }
-};
+  return finalizeRes;
+}
+
+export async function deleteMovie(fileName, subFolder) {
+  const presignRes = await At.createFetch('/files/deletePresign', 'post', {fileName, subFolder}, true);
+  if (!presignRes.success) return presignRes;
+
+  const url = presignRes.data.data.url;
+
+  const deleteRes = await axios.delete(url);
+
+  if (deleteRes.status !== 200) return {success: false, message: 'Delete from S3 failed'};
+
+  const finalizeRes = await At.createFetch('/files/finalizeDelete', 'post', {fileName, subFolder}, true);
+
+  return finalizeRes;
+}
