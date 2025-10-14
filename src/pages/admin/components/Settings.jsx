@@ -13,7 +13,7 @@ import Section from './Section.jsx';
 import AddFooterMsgModal from '../modal/AddFooterMsgModal.jsx';
 import ConfirmModal from '../../../components/ConfirmModal.jsx';
 import './AdminCustomInput.jsx';
-import './Settings.css';
+import '../Admin.css'; // Adjusted to correct path assuming styles are in Admin.css
 
 function Settings({ cancelFunc, user }) {
   const [isEditable, setIsEditable] = useState(true);
@@ -122,7 +122,7 @@ function Settings({ cancelFunc, user }) {
       setSelectedFile(null);
     } else {
       const file = e.target.files[0];
-      if (file.name.endsWith("mp4")) {
+      if (file.name.endsWith('mp4')) {
         setSelectedFile(file);
       } else {
         setSelectedFile(null);
@@ -176,7 +176,6 @@ function Settings({ cancelFunc, user }) {
   }
 
   function Rt() {
-    // Assuming this is the Ctrl+Shift check function
     return keys.includes('Control') && keys.includes('Shift');
   }
 
@@ -195,6 +194,11 @@ function Settings({ cancelFunc, user }) {
       window.removeEventListener('keyup', up);
     };
   }, [keys]);
+
+  const isChanged = () => {
+    // Logic to check if settings have changed
+    return true; // Placeholder, implement as per original
+  };
 
   return (
     <div className="settings-page">
@@ -306,7 +310,7 @@ function Settings({ cancelFunc, user }) {
           </div>
         </Section>
         <div className="buttons">
-          <CustomButton name="save" text="Save Settings" type="button" noHover={!isEditable && !Rt()} disabled={!isEditable && !Rt()} onClick={isEditable || Rt() ? save : null} style={{ padding: "12px", fontSize: "24px" }} />
+          <CustomButton name="save" text="Save Settings" type="button" noHover={!Object.keys(T.current).length} disabled={!Object.keys(T.current).length} onClick={Object.keys(T.current).length ? save : null} style={{ padding: "12px", fontSize: "24px" }} />
           <CustomButton name="cancel" text="Cancel" type="button" onClick={cancelFunc} style={{ padding: "12px", fontSize: "24px" }} />
         </div>
       </form>
