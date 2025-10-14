@@ -1,38 +1,31 @@
-// src/api/movies.jsx
-import At from './db.jsx'; // assuming this is the import for the API wrapper
-import axios from 'axios';
+import { envVar } from "../utils/env";
 
-export async function uploadMovie(file, subFolder, onProgress) {
-  const presignRes = await At.createFetch('/files/presign', 'post', {fileName: file.name, subFolder, contentType: file.type}, true);
-  if (!presignRes.success) return presignRes;
+export default async function getCategoryMovies(category, pageId = 1) {
+    try {
+        let urlApi = envVar('ONLINE_MOVIES_API_URL');
+        urlApi += category;
+        urlApi += `&page=${pageId}`;
 
-  const url = presignRes.data.data.url; // assuming structure {success: true, data: {url: presignedUrl}}
+        const result = await fetch(urlApi, {
+            headers: {
+                Authorization: envVar('ONLINE_MOVIES_API_KEY')
+            }}
+        );
+        const data = await result.json();
 
-  const putConfig = {
-    headers: {'Content-Type': file.type},
-    onUploadProgress
-  };
-
-  const putRes = await axios.put(url, file, putConfig);
-
-  if (putRes.status !== 200) return {success: false, message: 'Upload to S3 failed'};
-
-  const finalizeRes = await At.createFetch('/files/finalize', 'post', {fileName: file.name, subFolder}, true);
-
-  return finalizeRes;
-}
-
-export async function deleteMovie(fileName, subFolder) {
-  const presignRes = await At.createFetch('/files/deletePresign', 'post', {fileName, subFolder}, true);
-  if (!presignRes.success) return presignRes;
-
-  const url = presignRes.data.data.url;
-
-  const deleteRes = await axios.delete(url);
-
-  if (deleteRes.status !== 200) return {success: false, message: 'Delete from S3 failed'};
-
-  const finalizeRes = await At.createFetch('/files/finalizeDelete', 'post', {fileName, subFolder}, true);
-
-  return finalizeRes;
+        if (result.ok) {
+            let relevantMovies = [];
+            
+            if (data.videos.length > 0) {
+                relevantMovies = data.videos.filter(m => m.duration > Number(envVar('ONLINE_MOVIES_MIN_DURATION')));
+                relevantMovies = relevantMovies.map(m => m.video_files[0].link);
+            }
+            return { success: true, category:category, totalMovies: relevantMovies.length, pageId:pageId, nextPage: data.next_page, videos: relevantMovies }
+        }
+        else
+            return { success: false, message: data.error };
+    }
+    catch (e) {
+        return { success: false, mesage: e.message }
+    }
 }
