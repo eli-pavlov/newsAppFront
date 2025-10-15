@@ -1,2 +1,2 @@
-test sentence
+test sentence.
 12345
