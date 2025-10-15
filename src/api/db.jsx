@@ -251,39 +251,53 @@ class DB_SERVER {
     }
 
     async uploadMovie(file, onUploadProgressCB, subFolder=null) {
-        // New S3 pre-signed URL upload flow (headers+JSON so server always sees fileName)
+        // Robust S3 pre-signed upload (tries /api/* first, then /files/*; sends header fallbacks)
         const subFolderSafe = (subFolder === undefined || subFolder === null) ? null : subFolder;
 
-        // build header fallbacks (work even if a client accidentally posts multipart/form-data)
+        // fallback headers so server sees values even if some client lib posts multipart/form-data
         const fallbackHeaders = {
         'x-file-name': encodeURIComponent(file.name),
         'x-content-type': file.type || 'application/octet-stream',
         };
         if (subFolderSafe) fallbackHeaders['x-sub-folder'] = subFolderSafe;
 
-        // 1) ask backend to presign (JSON body + headers)
-        const presignRes = await this.axios.post(
-        '/files/presign',
+        // small helper to try a list of paths until one works
+        const postJSON = async (paths, body) => {
+        let lastErr;
+        for (const p of paths) {
+            try {
+            const res = await this.axios.post(
+                p,
+                body,
+                { headers: Object.assign({ 'Content-Type': 'application/json' }, fallbackHeaders) }
+            );
+            return res.data;
+            } catch (e) {
+            lastErr = e;
+            if (e?.response?.status !== 404 && e?.response?.status !== 405) throw e;
+            // else try next path
+            }
+        }
+        throw lastErr || new Error('No working endpoint path');
+        };
+
+        // 1) presign
+        const presignResp = await postJSON(
+        ['/api/files/presign', '/files/presign'],
         {
             fileName: file.name,
             contentType: file.type || 'application/octet-stream',
             subFolder: subFolderSafe,
-        },
-        { headers: Object.assign({ 'Content-Type': 'application/json' }, fallbackHeaders) }
+        }
         );
-        const presignResp = presignRes.data;
         if (!presignResp || !presignResp.success) {
         return presignResp || { success: false, message: 'Presign failed' };
         }
 
-        // 2) upload directly to S3 with PUT (progress supported)
+        // 2) direct PUT to S3 (progress supported)
         const { url, headers, objectKey, publicUrl } = presignResp;
-
         const putResp = await this.axios.put(url, file, {
-        headers: Object.assign(
-            { 'Content-Type': file.type || 'application/octet-stream' },
-            headers || {}
-        ),
+        headers: Object.assign({ 'Content-Type': file.type || 'application/octet-stream' }, headers || {}),
         onUploadProgress: (onUploadProgressCB ? onUploadProgressCB : undefined),
         maxBodyLength: Infinity,
         });
@@ -291,14 +305,11 @@ class DB_SERVER {
         return { success: false, message: 'S3 upload failed', status: putResp.status };
         }
 
-        // 3) finalize on backend (verification + normalized response)
-        // send both JSON body and the same fallback headers, so either path works
-        const finalizeRes = await this.axios.post(
-        '/files/finalize',
-        { objectKey, fileName: file.name, subFolder: subFolderSafe },
-        { headers: Object.assign({ 'Content-Type': 'application/json' }, fallbackHeaders) }
+        // 3) finalize (server verifies object; returns normalized shape)
+        const finalizeResp = await postJSON(
+        ['/api/files/finalize', '/files/finalize'],
+        { objectKey, fileName: file.name, subFolder: subFolderSafe }
         );
-        const finalizeResp = finalizeRes.data;
         if (!finalizeResp || !finalizeResp.success) {
         return finalizeResp || { success: false, message: 'Finalize failed' };
         }
@@ -309,7 +320,6 @@ class DB_SERVER {
         file_name: file.name,
         subFolder: subFolderSafe
         };
-
     }
 }
 
