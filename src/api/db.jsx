@@ -251,23 +251,51 @@ class DB_SERVER {
     }
 
     async uploadMovie(file, onUploadProgressCB, subFolder=null) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("subFolder", subFolder);
+        // New S3 pre-signed URL upload flow (kept method signature & return shape)
+        const subFolderSafe = (subFolder === undefined || subFolder === null) ? null : subFolder;
 
-                const response = await this.createFetch('/files/upload', 'post', formData, true, {}, false, onUploadProgressCB);
+        // 1) ask backend to presign
+        const presignResp = await this.createFetch('/files/presign', 'post', {
+            fileName: file.name,
+            contentType: file.type || 'application/octet-stream',
+            subFolder: subFolderSafe
+        }, true, {}, true, null);
 
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
+        if (!presignResp.success) {
+            return presignResp; // {success:false,message}
+        }
+
+        // 2) upload directly to S3 with PUT via axios to allow progress callback
+        const { url, headers, objectKey, publicUrl } = presignResp;
+
+        const putResp = await this.axios.put(url, file, {
+            headers: Object.assign({'Content-Type': file.type || 'application/octet-stream'}, headers||{}),
+            onUploadProgress: (onUploadProgressCB ? onUploadProgressCB : undefined),
+            maxBodyLength: Infinity
+        });
+
+        if (!(putResp.status === 200 || putResp.status === 201 || putResp.status === 204)) {
+            return { success: false, message: 'S3 upload failed', status: putResp.status };
+        }
+
+        // 3) finalize on backend (optional verification)
+        const finalizeResp = await this.createFetch('/files/finalize', 'post', {
+            objectKey,
+            fileName: file.name,
+            subFolder: subFolderSafe
+        }, true, {}, true, null);
+
+        if (!finalizeResp.success) {
+            return finalizeResp;
+        }
+
+        // keep backward-compatible return shape expected by Settings page
+        return {
+            success: true,
+            url: publicUrl || finalizeResp.url,
+            file_name: file.name,
+            subFolder: subFolderSafe
+        };
     }
 }
 
