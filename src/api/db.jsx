@@ -73,7 +73,7 @@ class DB_SERVER {
                 const response = await this.createFetch('/db/available', 'get');
 
                 if (response.success)
-                    resolve({ success: true });
+                    resolve(response);
                 else
                     resolve({ success: false, message: response.message });
             }
