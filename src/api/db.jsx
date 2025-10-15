@@ -251,51 +251,65 @@ class DB_SERVER {
     }
 
     async uploadMovie(file, onUploadProgressCB, subFolder=null) {
-        // New S3 pre-signed URL upload flow (kept method signature & return shape)
+        // New S3 pre-signed URL upload flow (headers+JSON so server always sees fileName)
         const subFolderSafe = (subFolder === undefined || subFolder === null) ? null : subFolder;
 
-        // 1) ask backend to presign
-        const presignResp = await this.createFetch('/files/presign', 'post', {
+        // build header fallbacks (work even if a client accidentally posts multipart/form-data)
+        const fallbackHeaders = {
+        'x-file-name': encodeURIComponent(file.name),
+        'x-content-type': file.type || 'application/octet-stream',
+        };
+        if (subFolderSafe) fallbackHeaders['x-sub-folder'] = subFolderSafe;
+
+        // 1) ask backend to presign (JSON body + headers)
+        const presignRes = await this.axios.post(
+        '/files/presign',
+        {
             fileName: file.name,
             contentType: file.type || 'application/octet-stream',
-            subFolder: subFolderSafe
-        }, true, {}, true, null);
-
-        if (!presignResp.success) {
-            return presignResp; // {success:false,message}
+            subFolder: subFolderSafe,
+        },
+        { headers: Object.assign({ 'Content-Type': 'application/json' }, fallbackHeaders) }
+        );
+        const presignResp = presignRes.data;
+        if (!presignResp || !presignResp.success) {
+        return presignResp || { success: false, message: 'Presign failed' };
         }
 
-        // 2) upload directly to S3 with PUT via axios to allow progress callback
+        // 2) upload directly to S3 with PUT (progress supported)
         const { url, headers, objectKey, publicUrl } = presignResp;
 
         const putResp = await this.axios.put(url, file, {
-            headers: Object.assign({'Content-Type': file.type || 'application/octet-stream'}, headers||{}),
-            onUploadProgress: (onUploadProgressCB ? onUploadProgressCB : undefined),
-            maxBodyLength: Infinity
+        headers: Object.assign(
+            { 'Content-Type': file.type || 'application/octet-stream' },
+            headers || {}
+        ),
+        onUploadProgress: (onUploadProgressCB ? onUploadProgressCB : undefined),
+        maxBodyLength: Infinity,
         });
-
         if (!(putResp.status === 200 || putResp.status === 201 || putResp.status === 204)) {
-            return { success: false, message: 'S3 upload failed', status: putResp.status };
+        return { success: false, message: 'S3 upload failed', status: putResp.status };
         }
 
-        // 3) finalize on backend (optional verification)
-        const finalizeResp = await this.createFetch('/files/finalize', 'post', {
-            objectKey,
-            fileName: file.name,
-            subFolder: subFolderSafe
-        }, true, {}, true, null);
-
-        if (!finalizeResp.success) {
-            return finalizeResp;
+        // 3) finalize on backend (verification + normalized response)
+        // send both JSON body and the same fallback headers, so either path works
+        const finalizeRes = await this.axios.post(
+        '/files/finalize',
+        { objectKey, fileName: file.name, subFolder: subFolderSafe },
+        { headers: Object.assign({ 'Content-Type': 'application/json' }, fallbackHeaders) }
+        );
+        const finalizeResp = finalizeRes.data;
+        if (!finalizeResp || !finalizeResp.success) {
+        return finalizeResp || { success: false, message: 'Finalize failed' };
         }
 
-        // keep backward-compatible return shape expected by Settings page
         return {
-            success: true,
-            url: publicUrl || finalizeResp.url,
-            file_name: file.name,
-            subFolder: subFolderSafe
+        success: true,
+        url: publicUrl || finalizeResp.url,
+        file_name: file.name,
+        subFolder: subFolderSafe
         };
+
     }
 }
 
