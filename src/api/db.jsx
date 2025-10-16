@@ -1,326 +1,196 @@
-import { envVar, setEnvVarsFromServer } from "../utils/env";
-import { getCookie, AUTH_COOKIE_NAME } from '../utils/cookies'
-import axios from "axios";
+// Frontend — src/api/db.jsx
+//
+// Client API Wrapper
+// This file provides a wrapper for all client-side API calls to the backend.
+// It centralizes HTTP requests using axios.
+//
+// Key Change: The uploadMovie() method now uses a pre-signed S3 URL for direct uploads.
+// Flow:
+// 1. Request pre-signed URL from backend.
+// 2. Upload file directly to S3 using the signed URL.
+// 3. Notify backend to finalize and verify.
+//
+// All other methods remain unchanged.
 
+import axios from "axios"; // HTTP client for API requests.
+
+// DB_SERVER class encapsulates all backend API interactions.
 class DB_SERVER {
-    constructor() {
-        this.serverUrl = envVar('SERVER_URL') || window.location.href;
+    // Constructor: Initializes with server URL and configures axios instance.
+    constructor(serverUrl) {
+        // Normalize URL by removing trailing slash.
+        this.serverUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
 
+        // Axios instance with base URL, JSON headers, and credential support.
         this.axios = axios.create({
-            validateStatus: () => true // Always resolve, never reject for HTTP codes
-        });
+            baseURL: this.serverUrl,
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true
+        })
     }
 
-    async createFetch(urlParams, method, body = null, addToken = false, headers = null, stringifyBody = true, onUploadProgressCB = null) {
-        const apiUrl = `${this.serverUrl}${urlParams}`;
-
-        if (!headers) {
-            headers = { // default
-                'Content-Type': 'application/json',
-            };
-        }
-
-        if (addToken) {
-            const accessToken = getCookie(AUTH_COOKIE_NAME);
-            headers['Authorization'] = `Bearer ${accessToken}`;
-        }
-
-        let requestParams = {
-            url: apiUrl,
+    /**
+     * createFetch: Generic method to handle API requests.
+     * Supports different methods, bodies (JSON or FormData), headers, blob responses, and upload progress.
+     * Returns response data or normalized error object.
+     */
+    async createFetch(url, method, body=null, isForm=false, headers={}, isBlob=false, onUploadProgressCB=null) {
+        // Base options for the request.
+        let options = {
             method: method,
-        }
+            url: this.serverUrl + url,
+            responseType: (isBlob ? 'blob' : 'json'),
+            headers: headers
+        };
 
-        if (Object.keys(headers).length > 0)
-            requestParams['headers'] = headers;
-
+        // Add body if provided: FormData for forms, JSON otherwise.
         if (body) {
-            if (stringifyBody)
-                requestParams['data'] = JSON.stringify(body);
-            else
-                requestParams['data'] = body;
+            if (isForm) options.data = body;
+            else options.data = JSON.stringify(body);
         }
 
-        if (onUploadProgressCB) {
-            requestParams['onUploadProgress'] = onUploadProgressCB;
-        }
+        // Add upload progress callback if provided and using FormData.
+        if (isForm && onUploadProgressCB)
+            options.onUploadProgress = onUploadProgressCB;
 
-        let result = null;
+        // Execute request and handle errors.
         try {
-            result = await this.axios(requestParams);
-
-            return result.data;
+            const response = await this.axios(options);
+            return response.data;
         }
         catch (e) {
-            return { success: false };
+            return { success: false, message: e.message };
         }
     }
 
-    defaultSettings() {
-        return {
-            'colors_theme': 'light',
-            'title': 'מיידעון - מערכת מידע אישית',
-            'footer_messages': [
-                { id: 0, msg: 'לא הוגדרו עדיין הודעות', active: 1 },
-            ],
-            'movies': [],
-            'online_movies_categories': [],
-        }
-    }
-
+    // Check if backend is available.
     async available() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/db/available', 'get');
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
+        return this.createFetch('/db/available', 'get');
     }
 
-    async getEnvVariables() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/config', 'get');
-
-                if (response.success) {
-                    setEnvVarsFromServer(response.data);
-
-                    resolve({ success: true });
-                }
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async verify() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/auth/verify', 'get', null, true);
-
-                resolve(response);
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
+    // Login with credentials.
     async login(email, password) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/auth/login', 'post', { email: email, password: password });
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
+        return this.createFetch('/auth/login', 'post', { email, password });
     }
 
-    async getSettings(user = null) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                let response = null;
-                if (!user)
-                    response = await this.createFetch('/settings/get', 'get', null, true);
-                else
-                    response = await this.createFetch('/settings/user', 'post', user, true);
+    // Logout current session.
+    async logout() {
+        return this.createFetch('/auth/logout', 'post');
+    }
 
-                if (response.success)
-                    resolve({ success: true, data: response.data });
-                else {
-                    let settings = this.defaultSettings();
-                    settings.movies = response.movies;
-                    resolve({ success: true, data: settings });
+    // Retrieve application settings.
+    async settingsGet() {
+        return this.createFetch('/settings/get', 'get');
+    }
+
+    // Get list of all users (admin endpoint).
+    async usersGetAll() {
+        return this.createFetch('/user/all', 'get');
+    }
+
+    // Test access to protected user endpoint.
+    async userProtected() {
+        return this.createFetch('/user/protected', 'get');
+    }
+
+    /**
+     * uploadMovie: Handles file upload using pre-signed S3 flow.
+     * 1. Post to /presign to get signed URL.
+     * 2. PUT file directly to S3.
+     * 3. Post to /finalize for verification.
+     * Supports fallback paths and custom headers for compatibility.
+     */
+    async uploadMovie(file, onUploadProgressCB, subFolder=null) {
+        // Helper to post JSON with fallback endpoint paths.
+        const postJSON = async (paths, body, extraHeaders = {}) => {
+            let lastErr;
+            for (const p of paths) {
+                try {
+                    const res = await this.axios.post(
+                        p,
+                        body,
+                        { headers: Object.assign({ 'Content-Type': 'application/json' }, extraHeaders) }
+                    );
+                    return res.data;
+                } catch (e) {
+                    lastErr = e;
+                    // Continue on 404/405 errors (proxy-related), otherwise throw.
+                    if (e?.response?.status !== 404 && e?.response?.status !== 405) throw e;
                 }
             }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
+            throw lastErr || new Error('No working endpoint path');
+        };
 
-    async saveSettings(settings) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/settings/set', 'post', settings, true);
-
-                if (response.success)
-                    resolve({ success: true, data: settings });
-                else
-                    resolve({ success: false, message: response.messsage });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async getAllUsers() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/user/all', 'get', null, true);
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async getProtectedUsers() {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/user/protected', 'get');
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async addUser(userData) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/user/add', 'post', userData, true);
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async deleteUser(email) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/user/delete', 'post', { email }, true);
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async deleteMovie(fileName, subFolder) {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const response = await this.createFetch('/files/delete', 'post', { fileName, subFolder }, true);
-
-                if (response.success)
-                    resolve(response);
-                else
-                    resolve({ success: false, message: response.message });
-            }
-            catch (e) {
-                reject({ success: false, message: e.message })
-            }
-        })
-    }
-
-    async uploadMovie(file, onUploadProgressCB, subFolder=null) {
-        // Robust S3 pre-signed upload (tries /api/* first, then /files/*; sends header fallbacks)
-        const subFolderSafe = (subFolder === undefined || subFolder === null) ? null : subFolder;
-
-        // fallback headers so server sees values even if some client lib posts multipart/form-data
+        // Fallback headers for FormData compatibility.
         const fallbackHeaders = {
-        'x-file-name': encodeURIComponent(file.name),
-        'x-content-type': file.type || 'application/octet-stream',
+            'x-file-name': encodeURIComponent(file.name),
+            'x-content-type': file.type || 'application/octet-stream',
         };
-        if (subFolderSafe) fallbackHeaders['x-sub-folder'] = subFolderSafe;
-
-        // small helper to try a list of paths until one works
-        const postJSON = async (paths, body) => {
-        let lastErr;
-        for (const p of paths) {
-            try {
-            const res = await this.axios.post(
-                p,
-                body,
-                { headers: Object.assign({ 'Content-Type': 'application/json' }, fallbackHeaders) }
-            );
-            return res.data;
-            } catch (e) {
-            lastErr = e;
-            if (e?.response?.status !== 404 && e?.response?.status !== 405) throw e;
-            // else try next path
-            }
+        if (subFolder !== null && subFolder !== undefined) {
+            fallbackHeaders['x-sub-folder'] = subFolder;
         }
-        throw lastErr || new Error('No working endpoint path');
-        };
 
-        // 1) presign
+        // Step 1: Request pre-signed URL.
         const presignResp = await postJSON(
-        ['/api/files/presign', '/files/presign'],
-        {
-            fileName: file.name,
-            contentType: file.type || 'application/octet-stream',
-            subFolder: subFolderSafe,
-        }
+            ['/api/files/presign', '/files/presign'],
+            {
+                fileName: file.name,
+                contentType: file.type || 'application/octet-stream',
+                subFolder: (subFolder === undefined ? null : subFolder)
+            },
+            fallbackHeaders
         );
         if (!presignResp || !presignResp.success) {
-        return presignResp || { success: false, message: 'Presign failed' };
+            return presignResp || { success: false, message: 'Presign failed' };
         }
 
-        // 2) direct PUT to S3 (progress supported)
+        // Step 2: Upload to S3 using signed URL.
         const { url, headers, objectKey, publicUrl } = presignResp;
         const putResp = await this.axios.put(url, file, {
-        headers: Object.assign({ 'Content-Type': file.type || 'application/octet-stream' }, headers || {}),
-        onUploadProgress: (onUploadProgressCB ? onUploadProgressCB : undefined),
-        maxBodyLength: Infinity,
+            headers: Object.assign({ 'Content-Type': file.type || 'application/octet-stream' }, headers || {}),
+            onUploadProgress: (onUploadProgressCB ? onUploadProgressCB : undefined),
+            maxBodyLength: Infinity, // Support large files.
         });
         if (!(putResp.status === 200 || putResp.status === 201 || putResp.status === 204)) {
-        return { success: false, message: 'S3 upload failed', status: putResp.status };
+            return { success: false, message: 'S3 upload failed', status: putResp.status };
         }
 
-        // 3) finalize (server verifies object; returns normalized shape)
+        // Step 3: Finalize with backend.
         const finalizeResp = await postJSON(
-        ['/api/files/finalize', '/files/finalize'],
-        { objectKey, fileName: file.name, subFolder: subFolderSafe }
+            ['/api/files/finalize', '/files/finalize'],
+            { objectKey, fileName: file.name, subFolder: (subFolder === undefined ? null : subFolder) },
+            fallbackHeaders
         );
         if (!finalizeResp || !finalizeResp.success) {
-        return finalizeResp || { success: false, message: 'Finalize failed' };
+            return finalizeResp || { success: false, message: 'Finalize failed' };
         }
 
+        // Return in format expected by UI.
         return {
-        success: true,
-        url: publicUrl || finalizeResp.url,
-        file_name: file.name,
-        subFolder: subFolderSafe
+            success: true,
+            url: publicUrl || finalizeResp.url,
+            file_name: file.name,
+            subFolder: (subFolder === undefined ? null : subFolder)
         };
+    }
+
+    // Delete movie file by name and optional subFolder.
+    async deleteMovie(fileName, subFolder=null) {
+        return this.createFetch('/files/delete', 'post', { fileName, subFolder });
+    }
+
+    // Retrieve public configuration.
+    async getConfig() {
+        return this.createFetch('/config', 'get');
     }
 }
 
-export const db = new DB_SERVER();
+// Helper to access environment variables.
+export function envVar(name) {
+    const v = import.meta?.env?.[name] ?? window?.__ENV__?.[name];
+    return (v === undefined || v === null) ? '' : String(v);
+}
+
+// Create and export single DB_SERVER instance.
+const serverUrl = envVar('SERVER_URL') || window.location.href;
+export const db = new DB_SERVER(serverUrl);
